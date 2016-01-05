@@ -98,3 +98,19 @@ a:hover {
         color: #EB42A3;
 }
 
+.line {
+    clear: left;
+}
+
+.title {
+    width: 30px;
+}
+
+.button {
+    background: #ffffff repeat scroll 0% 0%;
+    color: #000000;
+    float: left;
+    padding: 0px 2px 3px 2px;
+    border-radius: 4px;
+    cursor: pointer;
+}

@@ -71,3 +71,22 @@ function serverGetPasswd(key, password) {
          };
   return makeJSONRequest(opts);
 }
+
+function pubServerGet(key) {
+  var opts =
+         { method: "GET",
+           url: "http://"+location.hostname+"/bastu_pub/"+key,
+         };
+  return makeJSONRequest(opts);
+}
+
+function pubServerLogin(username, password, remember) {
+  var opts =
+         { method: "GET",
+           url: "http://"+location.hostname+"/bastu_pub/login",
+           query:  ("username="+username+
+                    "&password="+encodeURIComponent(password)+
+                    "&remember="+remember)
+         };
+  return makeJSONRequest(opts);
+}
