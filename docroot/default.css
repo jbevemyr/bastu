@@ -1,0 +1,100 @@
+/*
+Design by Free CSS Templates
+http://www.freecsstemplates.org
+Released for free under a Creative Commons Attribution 2.5 License
+*/
+
+body {
+        margin: 10px;
+        padding: 10px;
+        background: #000000;
+        font-size: 13px;
+	/* color: #8C8C8C; */
+        color: #3AA0B9;
+}
+
+.head {
+    display: flex;
+
+    flex-flow: row wrap;
+    justify-content: flex-start;
+
+    align-items: center;
+    align-content: flex-start;
+}
+
+.boxes {
+    display: flex;
+
+    flex-flow: row wrap;
+    justify-content: flex-start;
+
+    align-items: center;
+    align-content: flex-start;
+}
+
+#switchboard {
+    padding-top: 10px;
+}
+
+.boxes div {
+    padding-left: 10px;
+}
+
+.boxes label {
+    padding-left: 3px;
+}
+
+
+body, th, td, input, select, option {
+        /* font-family: Georgia, "Times New Roman", Times, serif; */
+        font-family: Arial, Verdana, Helvetica, sans-serif;
+}
+
+textarea {
+  font-family: Arial, Verdana, Helvetica, sans-serif;
+  font-size: 12px;
+}
+
+h1, h2, h3, h3 a {
+        font-family: Georgia, "Times New Roman", Times, serif;
+        font-weight: normal;
+        color: #CBA61A;
+}
+
+h1 {
+        letter-spacing: -2px;
+        font-size: 3em;
+}
+
+h2 {
+        letter-spacing: -1px;
+        font-size: 2em;
+}
+
+h3 {
+        font-size: 1.5em;
+}
+
+p, ul, ol {
+        line-height: 140%;
+}
+
+blockquote {
+        padding-left: 1em;
+}
+
+blockquote p, blockquote ul, blockquote ol {
+        line-height: normal;
+        font-style: italic;
+}
+
+a {
+        color: #3AA0B9;
+}
+
+a:hover {
+        text-decoration: none;
+        color: #EB42A3;
+}
+
