@@ -6,7 +6,7 @@ else
 DEBUG_FLAGS =
 endif
 
-MODULES=bastu
+MODULES=bastu bastu_pub comet
 
 EBIN_FILES=$(MODULES:%=../ebin/%.$(EMULATOR))
 
