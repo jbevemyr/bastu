@@ -84,7 +84,7 @@ function pubServerLogin(username, password, remember) {
   var opts =
          { method: "GET",
            url: "http://"+location.hostname+"/bastu_pub/login",
-           query:  ("username="+username+
+           query:  ("user="+username+
                     "&password="+encodeURIComponent(password)+
                     "&remember="+remember)
          };

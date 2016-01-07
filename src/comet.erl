@@ -263,7 +263,7 @@ reply_pending(D, Res, Ref) ->
             {From, RpcRef, TRef} = D#device.pending,
             if Ref == RpcRef ->
                     timer:cancel(TRef),
-                    gen_server:reply(From, Res),
+                    gen_server:reply(From, {ok, Res}),
                     D#device{pending=undefined};
                true ->
                     D

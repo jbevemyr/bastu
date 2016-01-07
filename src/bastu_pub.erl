@@ -152,10 +152,10 @@ do_op("get-work", L, Json, _Arg) ->
         case gen_server:call(comet, {get_work, Dev}, infinity) of
             nowork ->
                 ?liof("no work for ~p\n", [Dev]),
-                rpcreply("nowork");
+                rpcreply({"nowork", []});
             {Rpc, RpcRef} ->
                 ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
-                rpcreply({struct, [{rpc, Rpc}, {id, RpcRef}]})
+                rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
     catch X:Y ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
@@ -163,7 +163,7 @@ do_op("get-work", L, Json, _Arg) ->
                                  erlang:get_stacktrace()]),
             Res2 = {struct, [{status, "error"},
                             {reason, "internal error"}]},
-            rpcreply(Res2)
+            rpcreply({Res2, []})
     end;
 
 do_op("reply", L, Json, _Arg) ->
@@ -174,10 +174,10 @@ do_op("reply", L, Json, _Arg) ->
         case gen_server:call(comet, {reply, Dev, Json, Id}, infinity) of
             nowork ->
                 ?liof("no work for ~p\n", [Dev]),
-                rpcreply("nowork");
+                rpcreply({"nowork", []});
             {Rpc, RpcRef} ->
                 ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
-                rpcreply({struct, [{rpc, Rpc}, {id, RpcRef}]})
+                rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
     catch
         X:Y ->
@@ -186,7 +186,7 @@ do_op("reply", L, Json, _Arg) ->
                                  erlang:get_stacktrace()]),
             Res2 = {struct, [{status, "error"},
                             {reason, "internal error"}]},
-            rpcreply(Res2)
+            rpcreply({Res2, []})
     end;
 
 do_op(Cmd, L, Json, Arg) ->
@@ -630,58 +630,81 @@ do_cmd("get_status", L, _Json, Arg, S) ->
     Sid = get_sid(Arg, L),
     case get_user_by_id(Sid, S) of
         U=#user{} ->
-            Temp = call_device(U, "get_temp"),
-            Status = call_device(U, "get_status"),
-            EndsAt = call_device(U, "get_end_time"),
-            %% Temp = gen_server:call({bastu, 'bastu@bastu'}, get_temp),
-            %% Status = gen_server:call({bastu, 'bastu@bastu'}, get_status),
-            %% EndsAt = gen_server:call({bastu, 'bastu@bastu'}, get_end_time),
-            Res = {struct, [{"temperature", Temp},
-                            {"status", Status},
-                            {"end_time", EndsAt}]};
+            Res =
+                try
+                    {ok, Temp} = call_device(U, "get_temp"),
+                    {ok, Status} = call_device(U, "get_status"),
+                    {ok, EndsAt} = call_device(U, "get_end_time"),
+                    %% Temp = gen_server:call({bastu, 'bastu@bastu'}, get_temp),
+                    %% Status = gen_server:call({bastu, 'bastu@bastu'}, get_status),
+                    %% EndsAt = gen_server:call({bastu, 'bastu@bastu'}, get_end_time),
+                    {struct, [{"temperature", Temp},
+                              {"status", Status},
+                              {"end_time", EndsAt}]}
+                catch
+                    X:Y ->
+                        error_logger:format("get_status failed: ~p:~p\n",
+                                            [X,Y]),
+                        {struct, [{"error", "no response"}]}
+                end;
         _ ->
             Res = {struct, [{status, "error"},
                             {reason, "unknown sid"}]}
     end,
-    {Res, S};
+    {{Res, []}, S};
 
 do_cmd("switch_on", L, _Json, Arg, S) ->
     Sid = get_sid(Arg, L),
     case get_user_by_id(Sid, S) of
         U=#user{} ->
-            Ok = call_device(U, "sauna_on"),
-            %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_on),
-            Res = {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+            Res =
+                try
+                    {ok, Ok} = call_device(U, "sauna_on"),
+                    %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_on),
+                    {struct, [{"status", "ok"}, {"result", to_string(Ok)}]}
+                catch
+                    X:Y ->
+                        error_logger:format("switch_on failed: ~p:~p\n",
+                                            [X,Y]),
+                        {struct, [{"error", "no response"}]}
+                end;
         _ ->
             Res = {struct, [{status, "error"},
                             {reason, "unknown sid"}]}
     end,
-    {Res, S};
+    {{Res,[]}, S};
 
 do_cmd("switch_off", L, _Json, Arg, S) ->
     Sid = get_sid(Arg, L),
     case get_user_by_id(Sid, S) of
         U=#user{} ->
-            Ok = call_device(U, "sauna_off"),
-            %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_off),
-            Res = {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+            Res =
+                try
+                    {ok, Ok} = call_device(U, "sauna_off"),
+                    %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_off),
+                    {struct, [{"status", "ok"}, {"result", to_string(Ok)}]}
+                catch
+                    X:Y ->
+                        error_logger:format("switch_off failed: ~p:~p\n",
+                                            [X,Y]),
+                        {struct, [{"error", "no response"}]}
+                end;
         _ ->
             Res = {struct, [{status, "error"},
                             {reason, "unknown sid"}]}
     end,
-    {Res, S};
+    {{Res,[]}, S};
 
 do_cmd(Unknown, _L, _Json, _Arg, S) ->
     Error = lists:flatten(io_lib:format("unknown request: ~p", [Unknown])),
     error_logger:format("~s", [Error]),
-    {{struct, [{"status", "error"}, {reason, Error}]}, S}.
+    {{{struct, [{"status", "error"}, {reason, Error}]}, []}, S}.
 
-rpcreply(Response) ->
+rpcreply({Response, ExtraHeaders}) ->
     X = json2:encode(Response),
     [{header, {cache_control, "no-cache"}},
      {header, "Access-Control-Allow-Origin: *"},
-     {header, "Expires: -1"},
-     {html, X}].
+     {header, "Expires: -1"}]++ExtraHeaders++[{html, X}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -923,6 +946,8 @@ object2user(U, [{"password", Password}|Props], Data) ->
     object2user(U#user{password=Password}, Props, Data);
 object2user(U, [{"sid", Sid}|Props], Data) ->
     object2user(U#user{sid=Sid}, Props, Data);
+object2user(U, [{"device", Id}|Props], Data) ->
+    object2user(U#user{device=Id}, Props, Data);
 object2user(U, [{"confirmed", Confirmed}|Props], Data) ->
     object2user(U#user{confirmed=Confirmed}, Props, Data);
 object2user(U, [{"role", Role}|Props], Data) ->

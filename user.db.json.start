@@ -9,7 +9,8 @@
   "passwd_reset_send_time":"",
   "email":"jb@bevemyr.com",
   "address":"Gosta Tamms väg 16",
-  "name":"Johan Bevemyr"
+  "name":"Johan Bevemyr",
+  "device": "B8:27:EB:00:E4:95"
  },
  {
   "username":"test",
@@ -21,6 +22,7 @@
   "passwd_reset_send_time":"",
   "email":"test@bevemyr.com",
   "address":"Gosta Tamms väg 16",
-  "name":"Test user"
+  "name":"Test user",
+  "device": "B8:27:EB:00:E4:95"
  }
 ]
