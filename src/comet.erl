@@ -170,7 +170,7 @@ handle_info({device_timeout, Dev}, State) ->
             D2 = cancel_request(D),
             D3 = cancel_pending(D2),
             cancel_queue(D3),
-            NewDevices = list:keydelete(Dev, #device.id, Devices),
+            NewDevices = lists:keydelete(Dev, #device.id, Devices),
             {noreply, State#state{devices=NewDevices}};
         _ ->
             {noreply, State}

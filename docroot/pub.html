@@ -15,8 +15,19 @@
      pubServerGet("get_status").then(function(result) {
        console.log("got temperature:"+result.temperature);
 
-       if (result.error == "no response") {
+       if (result.error && result.error != "unknown sid") {
          console.log("got error:"+result.error);
+         setTimeout(refreshStats, 3000);
+
+         if ($.cookie("sid")) {
+           $("#login").hide();
+           $("#page").show();
+         }
+         else {
+           $("#page").hide();
+           $("#login").show();
+         }
+
          return;
        }
 
@@ -69,7 +80,7 @@
          console.log('Toggle is now ON!');
          pubServerGet("switch_on").then(function(res) {
            console.log("res="+res);
-           if(res.status == "error") {
+           if(res.error && res.error == "unknown sid") {
              $.removeCookie('sid', { path: '/' });
              var myToggle = $("#switch").data('toggles');
              myToggle.toggle(false, false, true);
@@ -85,7 +96,7 @@
        } else {
          console.log('Toggle is now OFF!');
          pubServerGet("switch_off").then(function(res) {
-           if(res.status == "error") {
+           if(res.error && res.error == "unknown sid") {
              $.removeCookie('sid', { path: '/' });
              var myToggle = $("#switch").data('toggles');
              myToggle.toggle(true, false, true);

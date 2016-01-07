@@ -659,9 +659,16 @@ do_cmd("switch_on", L, _Json, Arg, S) ->
         U=#user{} ->
             Res =
                 try
-                    {ok, Ok} = call_device(U, "sauna_on"),
-                    %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_on),
-                    {struct, [{"status", "ok"}, {"result", to_string(Ok)}]}
+                    case call_device(U, "sauna_on") of
+                        {ok, Ok} ->
+                            {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+                        {error, "no such device"} ->
+                            {struct, [{"error", "no such device"}]};
+                        {error, "no response"}->
+                            {struct, [{"error", "no response"}]};
+                        _ ->
+                            {struct, [{"error", "internal"}]}
+                    end
                 catch
                     X:Y ->
                         error_logger:format("switch_on failed: ~p:~p\n",
@@ -680,9 +687,16 @@ do_cmd("switch_off", L, _Json, Arg, S) ->
         U=#user{} ->
             Res =
                 try
-                    {ok, Ok} = call_device(U, "sauna_off"),
-                    %% Ok = gen_server:call({bastu, 'bastu@bastu'}, sauna_off),
-                    {struct, [{"status", "ok"}, {"result", to_string(Ok)}]}
+                    case call_device(U, "sauna_off") of
+                        {ok, Ok} ->
+                            {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+                        {error, "no such device"} ->
+                            {struct, [{"error", "no such device"}]};
+                        {error, "no response"}->
+                            {struct, [{"error", "no response"}]};
+                        _ ->
+                            {struct, [{"error", "internal"}]}
+                    end
                 catch
                     X:Y ->
                         error_logger:format("switch_off failed: ~p:~p\n",
