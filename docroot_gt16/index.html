@@ -25,30 +25,38 @@
 
    function refreshStats() {
      pubServerGet("get_status").then(function(result) {
-       // console.log("got temperature:"+result.temperature);
+       console.log("got:"+JSON.stringify(result));
 
-       if (result.error && result.error != "unknown sid") {
-         console.log("got error:"+result.error);
-         setTimeout(refreshStats, 3000);
+       if (result.error) {
+         console.log("got an error");
+         if (result.error && result.error != "unknown sid") {
+           console.log("got error:"+result.error);
 
-         if (result.error == "no response" || result.error == "no such device") {
-           $("#temperature").empty();
-           $("#temperature").append("<h2>Device not present</h2>");
-           
-           var myToggle = $("#switch").data('toggles');
-           $("#runtime").hide();
-           myToggle.toggle(false, false, true);
+           if (result.error == "no response" || result.error == "no such device") {
+             $("#temperature").empty();
+             $("#temperature").append("<h2>Device not present</h2>");
+             
+             var myToggle = $("#switch").data('toggles');
+             $("#runtime").hide();
+             myToggle.toggle(false, false, true);
+           }
+
+           if ($.cookie("sid")) {
+             $("#login").hide();
+             $("#page").show();
+           }
+           else {
+             $("#page").hide();
+             $("#login").show();
+           }
          }
-
-         if ($.cookie("sid")) {
-           $("#login").hide();
-           $("#page").show();
-         }
-         else {
-           $("#page").hide();
+         else if (result.error == "unknown sid") {
+           $.removeCookie('sid', { path: '/' });
            $("#login").show();
+           $("#page").hide();
          }
 
+         setTimeout(refreshStats, 3000);
          return;
        }
 

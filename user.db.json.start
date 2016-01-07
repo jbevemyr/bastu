@@ -1,7 +1,7 @@
 [
  {
   "username":"johan",
-  "password":"CY9rzUYh03PK3k6DJie09g==",
+  "password":"m9hbifDY23/6vX+X8iTF5A==",
   "sid":"1234567890",
   "confirmed":false,
   "role":"admin",
@@ -10,7 +10,33 @@
   "email":"jb@bevemyr.com",
   "address":"Gosta Tamms väg 16",
   "name":"Johan Bevemyr",
-  "device": "B8:27:EB:00:E4:95"
+  "device": "B8:27:EB:F4:24:0B"
+ },
+ {
+  "username":"gt16",
+  "password":"sBe1pyaB35WYVCURKjgTmg==",
+  "sid":"1234567890",
+  "confirmed":false,
+  "role":"admin",
+  "passwd_reset_id":"",
+  "passwd_reset_send_time":"",
+  "email":"jb@bevemyr.com",
+  "address":"Gosta Tamms väg 16",
+  "name":"Gosta Tamms vag 16",
+  "device": "B8:27:EB:F4:24:0B"
+ },
+ {
+  "username":"katrin",
+  "password":"DWbiaxKB7oiaFdtWzfKbCg==",
+  "sid":"1234567890",
+  "confirmed":false,
+  "role":"admin",
+  "passwd_reset_id":"",
+  "passwd_reset_send_time":"",
+  "email":"jb@bevemyr.com",
+  "address":"Gosta Tamms väg 16",
+  "name":"Gosta Tamms vag 16",
+  "device": "B8:27:EB:F4:24:0B"
  },
  {
   "username":"test",

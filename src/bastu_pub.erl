@@ -56,12 +56,12 @@ out(#arg{req = #http_request{method = 'POST'},
            content_type = "multipart/form-data"++_}} = A) ->
     case yaws_api:parse_multipart_post(A) of
         [] ->
-            Res = {struct, [{status, "error"},{reason, "broken post"}]},
+            Res = {struct, [{error, "broken post"}]},
             rpcreply(Res);
         {cont, _, _}
           when is_record(A#arg.state, post_state),
                A#arg.state#post_state.count == 10 ->
-            Res = {struct, [{status, "error"},{reason, "to big post"}]},
+            Res = {struct, [{error, "to big post"}]},
             rpcreply(Res);
         {cont, Cont, Res}  ->
             PState = A#arg.state,
@@ -77,8 +77,7 @@ out(#arg{req = #http_request{method = 'POST'},
                     L = yaws_api:parse_query(A),
                     do_op(A#arg.appmoddata, L, Json, A);
                 _Reason ->
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid json"}]},
+                    Res = {struct, [{error,"invalid json"}]},
                     rpcreply(Res)
             end
     end;
@@ -95,8 +94,7 @@ out(#arg{req = #http_request{method = 'POST'},
         _Reason ->
             io:format("json=~p\n", [DecodedClidata]),
             io:format("got error ~p\n", [_Reason]),
-            Res = {struct, [{status, "error"},
-                            {reason, "invalid json"}]},
+            Res = {struct, [{error,"invalid json"}]},
             rpcreply(Res)
     end;
 out(#arg{req = #http_request{method = 'POST'}} = A) ->
@@ -128,8 +126,7 @@ out(#arg{req = #http_request{method = 'POST'}} = A) ->
                 _Reason ->
                     ?liof("json=~p\n", [Clidata]),
                     ?liof("got error ~p\n", [_Reason]),
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid json"}]},
+                    Res = {struct, [{error, "invalid json"}]},
                     rpcreply(Res)
             end
     end;
@@ -161,8 +158,7 @@ do_op("get-work", L, Json, _Arg) ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
                                 ["get-work", L, Json, X, Y,
                                  erlang:get_stacktrace()]),
-            Res2 = {struct, [{status, "error"},
-                            {reason, "internal error"}]},
+            Res2 = {struct, [{error, "internal error"}]},
             rpcreply({Res2, []})
     end;
 
@@ -184,8 +180,7 @@ do_op("reply", L, Json, _Arg) ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
                                 ["reply", L, Json, X, Y,
                                  erlang:get_stacktrace()]),
-            Res2 = {struct, [{status, "error"},
-                            {reason, "internal error"}]},
+            Res2 = {struct, [{error, "internal error"}]},
             rpcreply({Res2, []})
     end;
 
@@ -197,8 +192,7 @@ do_op(Cmd, L, Json, Arg) ->
         X:Y ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
                                 [Cmd, L, Json, X, Y, erlang:get_stacktrace()]),
-            Res2 = {struct, [{status, "error"},
-                            {reason, "internal error"}]},
+            Res2 = {struct, [{error, "internal error"}]},
             rpcreply(Res2)
     end.
 
@@ -283,12 +277,11 @@ handle_call({Cmd, L, Json, Arg}, _From, S) ->
             error_logger:format(
               "error during exection of cmd ~p: ~p ~p\n",
               [{Cmd, L, Json}, {X,Y}, erlang:get_stacktrace()]),
-            {reply, {struct, [{status, "error"}, {reason, "internal"}]}, S}
+            {reply, {struct, [{error, "internal"}]}, S}
     end;
 
 handle_call(_Request, _From, S) ->
-    Res = {struct, [{status, "error"},
-                    {reason, "unknown request"}]},
+    Res = {struct, [{error, "unknown request"}]},
     {reply, Res, S}.
 
 %%----------------------------------------------------------------------
@@ -329,26 +322,26 @@ do_cmd("login", L, _Json, _A, S) ->
     User = get_val("user", L, ""),
     Password = get_val("password", L, ""),
     Remember = get_val("remember", L, "false"),
-    Md5Pass = ?b2l(base64:encode(crypto:hash(md5, Password))),
+    Md5Pass = encode_pass(Password),
     case get_user_by_name(User, S) of
         U=#user{password = Md5Pass} when Remember == "true" ->
             %% login successful
             {Y,M,D} = date(),
             Expires= format_expires_date({{Y+1,M,D},time()}),
             Headers=[yaws_api:setcookie("sid", U#user.sid, "/", Expires)],
-            Res = {struct, [{status, "ok"}, {"sid", U#user.sid},
+            Res = {struct, [{"sid", U#user.sid},
                             {group, ?a2l(U#user.role)}]};
         U=#user{password = Md5Pass} ->
             %% login successful
             Headers=[yaws_api:setcookie("sid", U#user.sid, "/")],
-            Res = {struct, [{status, "ok"}, {"sid", U#user.sid},
+            Res = {struct, [{"sid", U#user.sid},
                             {group, ?a2l(U#user.role)}]};
         #user{} ->
             Headers=[],
-            Res = {struct, [{status, "error"}, {reason, "invalid password"}]};
+            Res = {struct, [{error, "invalid password"}]};
         _ ->
             Headers=[],
-            Res = {struct, [{status, "error"}, {reason, "unknown user"}]}
+            Res = {struct, [{error, "unknown user"}]}
     end,
     {{Res,Headers}, S};
 
@@ -387,15 +380,14 @@ do_cmd("reset_password", L, _Json, _A, S) ->
                     %% login successful
                     Md5Pass = ?b2l(base64:encode(crypto:hash(md5, Password))),
                     NewU = U#user{password=Md5Pass},
-                    Res = {struct, [{status, "ok"}, {user, user2object(U)}]},
+                    Res = {struct, [{user, user2object(U)}]},
                     {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
                true ->
-                    Res = {struct, [{status, "error"},
-                                    {reason, "password reset link has expired"}]},
+                    Res = {struct, [{error, "password reset link has expired"}]},
                     {{Res, []}, S}
             end;
         _ ->
-            Res = {struct, [{status, "error"}, {reason, "unknown sid"}]},
+            Res = {struct, [{error, "unknown sid"}]},
             {{Res, []}, S}
     end;
 
@@ -413,7 +405,7 @@ do_cmd("set_password", L, _Json, A, S) ->
             Res = {struct, [{status, "ok"}]},
             {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
         _ ->
-            Res = {struct, [{status, "error"}, {reason, "unknown sid"}]},
+            Res = {struct, [{error, "unknown sid"}]},
             {{Res, []}, S}
     end;
 
@@ -432,17 +424,14 @@ do_cmd("set_user_password", L, _Json, A, S) ->
                     NewS = S#state{users=update_user(NewU, S#state.users)},
                     {{Res, []}, NewS};
                 false ->
-                    Res = {struct, [{status, "error"},
-                                    {reason, "unknown user"}]},
+                    Res = {struct, [{error, "unknown user"}]},
                     {{Res, []}, S}
             end;
         #user{} ->
-            Res = {struct, [{status, "error"},
-                            {reason, "only allowed for admin user"}]},
+            Res = {struct, [{error, "only allowed for admin user"}]},
             {{Res,[]}, S};
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]},
+            Res = {struct, [{error,"unknown sid"}]},
             {{Res,[]}, S}
     end;
 
@@ -452,12 +441,10 @@ do_cmd("get_all_users", L, _Json, A, S) ->
     case get_user_by_id(Sid, S) of
         #user{} ->
             %% login successful
-            Res = {struct, [{status, "ok"},
-                            {users, {array, [user2object(U) ||
+            Res = {struct, [{users, {array, [user2object(U) ||
                                                 U <- S#state.users]}}]};
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error,"unknown sid"}]}
     end,
     {{Res,[]}, S};
 
@@ -467,10 +454,9 @@ do_cmd("get_user", L, _Json, A, S) ->
     case get_user_by_id(Sid, S) of
         U=#user{} ->
             %% login successful
-            Res = {struct, [{status, "ok"}, {user, user2object(U)}]};
+            Res = {struct, [{user, user2object(U)}]};
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error,"unknown sid"}]}
     end,
     {{Res, []}, S};
 
@@ -482,18 +468,14 @@ do_cmd("get_named_user", L, _Json, A, S) ->
             Username = get_val("username", L, ""),
             case get_user_by_name(Username, S) of
                 OU=#user{} ->
-                    Res = {struct, [{status, "ok"},
-                                    {user, user2object(OU)}]};
+                    Res = {struct, [{user, user2object(OU)}]};
                 false ->
-                    Res = {struct, [{status, "error"},
-                                    {reason, "unknown user"}]}
+                    Res = {struct, [{error, "unknown user"}]}
             end;
         #user{} ->
-            Res = {struct, [{status, "error"},
-                            {reason, "only allowed for admin user"}]};
+            Res = {struct, [{error, "only allowed for admin user"}]};
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res,[]}, S};
 
@@ -508,8 +490,7 @@ do_cmd("set_user", L, Json, A, S) ->
             Res = {struct, [{status, "ok"}]},
             {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]},
+            Res = {struct, [{error, "unknown sid"}]},
             {{Res, []}, S}
     end;
 
@@ -527,17 +508,14 @@ do_cmd("set_named_user", L, Json, A, S) ->
                     NewS = S#state{users=update_user(NewU, S#state.users)};
                 false ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "unknown user"}]}
+                    Res = {struct, [{error, "unknown user"}]}
             end;
         #user{} ->
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "only allowed for admin user"}]};
+            Res = {struct, [{error, "only allowed for admin user"}]};
         _ ->
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res, []}, NewS};
 
@@ -554,20 +532,16 @@ do_cmd("add_user", L0, Json, A, S) ->
             Exists = get_user_by_name(Username, S) =/= false,
             if Username == "" ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid username"}]};
+                    Res = {struct, [{error, "invalid username"}]};
                Password == "" ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid password"}]};
+                    Res = {struct, [{error, "invalid password"}]};
                Role == "" ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid role"}]};
+                    Res = {struct, [{error, "invalid role"}]};
                Exists ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "a user with the same name "
+                    Res = {struct, [{error, "a user with the same name "
                                      "already exists"}]};
                true ->
                     Md5Pass = ?b2l(base64:encode(crypto:hash(md5, Password))),
@@ -583,12 +557,10 @@ do_cmd("add_user", L0, Json, A, S) ->
         #user{} ->
             %% login successful
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "only admin can create users"}]};
+            Res = {struct, [{error, "only admin can create users"}]};
         _ ->
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res, []}, NewS};
 
@@ -602,12 +574,10 @@ do_cmd("del_user", L, _Json, A, S) ->
             DelUser = get_user_by_name(Username, S),
             if Username == "" ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "invalid username"}]};
+                    Res = {struct, [{error, "invalid username"}]};
                DelUser == false ->
                     NewS = S,
-                    Res = {struct, [{status, "error"},
-                                    {reason, "the user does not exist"}]};
+                    Res = {struct, [{error, "the user does not exist"}]};
                true ->
                     NewUsers = lists:delete(DelUser, S#state.users),
                     store_users(NewUsers),
@@ -617,12 +587,10 @@ do_cmd("del_user", L, _Json, A, S) ->
         #user{} ->
             %% login successful
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "only admin can remove users"}]};
+            Res = {struct, [{error, "only admin can remove users"}]};
         _ ->
             NewS = S,
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res, []}, NewS};
 
@@ -648,8 +616,7 @@ do_cmd("get_status", L, _Json, Arg, S) ->
                         {struct, [{"error", "no response"}]}
                 end;
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res, []}, S};
 
@@ -661,7 +628,7 @@ do_cmd("switch_on", L, _Json, Arg, S) ->
                 try
                     case call_device(U, "sauna_on") of
                         {ok, Ok} ->
-                            {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+                            {struct, [{"result", to_string(Ok)}]};
                         {error, "no such device"} ->
                             {struct, [{"error", "no such device"}]};
                         {error, "no response"}->
@@ -676,8 +643,7 @@ do_cmd("switch_on", L, _Json, Arg, S) ->
                         {struct, [{"error", "no response"}]}
                 end;
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res,[]}, S};
 
@@ -689,7 +655,7 @@ do_cmd("switch_off", L, _Json, Arg, S) ->
                 try
                     case call_device(U, "sauna_off") of
                         {ok, Ok} ->
-                            {struct, [{"status", "ok"}, {"result", to_string(Ok)}]};
+                            {struct, [{"result", to_string(Ok)}]};
                         {error, "no such device"} ->
                             {struct, [{"error", "no such device"}]};
                         {error, "no response"}->
@@ -704,15 +670,14 @@ do_cmd("switch_off", L, _Json, Arg, S) ->
                         {struct, [{"error", "no response"}]}
                 end;
         _ ->
-            Res = {struct, [{status, "error"},
-                            {reason, "unknown sid"}]}
+            Res = {struct, [{error, "unknown sid"}]}
     end,
     {{Res,[]}, S};
 
 do_cmd(Unknown, _L, _Json, _Arg, S) ->
     Error = lists:flatten(io_lib:format("unknown request: ~p", [Unknown])),
     error_logger:format("~s", [Error]),
-    {{{struct, [{"status", "error"}, {reason, Error}]}, []}, S}.
+    {{{struct, [{error, Error}]}, []}, S}.
 
 rpcreply({Response, ExtraHeaders}) ->
     X = json2:encode(Response),
@@ -1012,3 +977,6 @@ call_device(U, Cmd) ->
        true ->
             gen_server:call(comet, {call, U#user.device, Cmd})
     end.
+
+encode_pass(Password) ->
+    ?b2l(base64:encode(crypto:hash(md5, Password))).
