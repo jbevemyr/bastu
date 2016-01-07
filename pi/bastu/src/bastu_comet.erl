@@ -10,7 +10,7 @@
 -compile(export_all).
 
 -define(SERVER, ?MODULE).
--define(PUBSERVER, "http://sauna.bevemyr.com").
+-define(PUBSERVER, "http://bastu.gt16.se").
 -define(RETRY_TTL, 5000).
 
 
@@ -57,7 +57,7 @@ handle_info({reply, RId, Res}, State) ->
     case url:post(?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId, Json) of
         {200, _Header, Body0} ->
 	    Body=lists:flatten(Body0),
-	    ?liof("Body=~p\n", [Body]),
+	    %% ?liof("Body=~p\n", [Body]),
             case json2:decode_string(Body) of
                 {ok, "nowork"} ->
                     %% ?liof("nothing to do\n", []),
@@ -90,12 +90,12 @@ handle_info(retry, State) ->
     case url:get(?PUBSERVER++"/bastu_pub/get-work?dev="++State#state.id) of
         {200, _Header, Body0} ->
 	    Body = lists:flatten(Body0),
-	    ?liof("Body=~p\n", [Body]),
+	    %% ?liof("Body=~p\n", [Body]),
             case json2:decode_string(Body) of
                 {ok, {struct, Args}} ->
                     Rpc = get_opt("rpc", Args, "noop"),
                     Id = get_opt("id", Args, "noref"),
-                    ?liof("Got work from server: ~p:~p\n", [Rpc, Id]),
+                    %% ?liof("Got work from server: ~p:~p\n", [Rpc, Id]),
                     do_rpc(Rpc, Id);
 		{ok, "nowork"} ->
                     self() ! retry;
