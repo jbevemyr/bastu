@@ -130,6 +130,9 @@ handle_call({reply, Dev, Res, Ref}, From, S) ->
     D6 = reset_device_timer(D5),
     NewDevices = update_devices(Devices, D6),
     {noreply, S#state{devices=NewDevices}};
+handle_call(get_ids, _From, S) ->
+    Ids = [D#device.id || D <- S#state.devices],
+    {reply, Ids, S};
 handle_call(stop, _From, S) ->
     {stop, normal, S};
 

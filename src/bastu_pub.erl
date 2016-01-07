@@ -209,6 +209,7 @@ do_op(Cmd, L, Json, Arg) ->
           passwd_reset_send_time=0, %% date_time() - send time time of last
                                     %% password reset email
           device,                 %% device id
+          comment=[],             %% info on reverse ssh port, for example
           data=[]                 %% [{string(), string()}]
          }).
 
@@ -906,6 +907,7 @@ user2object(U) ->
       {"sid", U#user.sid},
       {"confirmed", U#user.confirmed},
       {"role", ?a2l(U#user.role)},
+      {"comment", U#user.comment},
       {"passwd_reset_id", U#user.passwd_reset_id},
       {"passwd_reset_send_time", U#user.passwd_reset_send_time}|
       U#user.data]}.
@@ -927,6 +929,8 @@ object2user(U, [{"sid", Sid}|Props], Data) ->
     object2user(U#user{sid=Sid}, Props, Data);
 object2user(U, [{"device", Id}|Props], Data) ->
     object2user(U#user{device=Id}, Props, Data);
+object2user(U, [{"comment", Str}|Props], Data) ->
+    object2user(U#user{comment=Str}, Props, Data);
 object2user(U, [{"confirmed", Confirmed}|Props], Data) ->
     object2user(U#user{confirmed=Confirmed}, Props, Data);
 object2user(U, [{"role", Role}|Props], Data) ->
