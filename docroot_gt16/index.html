@@ -19,6 +19,15 @@
          console.log("got error:"+result.error);
          setTimeout(refreshStats, 3000);
 
+         if (result.error == "no response" || result.error == "no such device") {
+           $("#temperature").empty();
+           $("#temperature").append("<h2>Device not present</h2>");
+           
+           var myToggle = $("#switch").data('toggles');
+           $("#runtime").hide();
+           myToggle.toggle(false, false, true);
+         }
+
          if ($.cookie("sid")) {
            $("#login").hide();
            $("#page").show();
