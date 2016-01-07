@@ -57,7 +57,9 @@ handle_call(get_temp, _From, S) ->
 handle_call(get_status, _From, S) ->
     {reply, S#state.status, S};
 handle_call(get_end_time, _From, S) ->
-    {reply, gtostr(S#state.start_time+?RUNTIME, time), S};
+    %% {reply, gtostr(S#state.start_time+?RUNTIME, time), S};
+    Remain = S#state.start_time+?RUNTIME-gnow(),
+    {reply, Remain, S};
 handle_call(Request, _From, S) ->
     error_logger:format("unknown request: ~p\n", [Request]),
     {reply, ok, S}.
