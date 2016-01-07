@@ -15,7 +15,7 @@
  {
   "username":"gt16",
   "password":"sBe1pyaB35WYVCURKjgTmg==",
-  "sid":"1234567890",
+  "sid":"12345678901",
   "confirmed":false,
   "role":"admin",
   "passwd_reset_id":"",
@@ -28,7 +28,7 @@
  {
   "username":"katrin",
   "password":"DWbiaxKB7oiaFdtWzfKbCg==",
-  "sid":"1234567890",
+  "sid":"12345678902",
   "confirmed":false,
   "role":"admin",
   "passwd_reset_id":"",
