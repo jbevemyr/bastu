@@ -129,3 +129,19 @@ a:hover {
     border-radius: 4px;
     cursor: pointer;
 }
+
+.line {
+    clear: left;
+    font-family: Georgia, "Times New Roman", Times, serif;
+    font-weight: normal;
+    color: #CBA61A;
+    font-size: 1.5em;
+}
+
+#until {
+    color: #3AA0B9;
+}
+
+#remain {
+    color: #3AA0B9;
+}

@@ -11,9 +11,21 @@
 
   <script>
 
+   function convertTo24Hour(time) {
+     time = time.toLowerCase();
+     var hours = parseInt(time.substr(0, 2));
+     if(time.indexOf('am') != -1 && hours == 12) {
+       time = time.replace('12', '00');
+     }
+     if(time.indexOf('pm')  != -1 && hours < 12) {
+       time = time.replace(hours, (hours + 12));
+     }
+     return time.replace(/(am|pm)/, '');
+   }
+
    function refreshStats() {
      pubServerGet("get_status").then(function(result) {
-       console.log("got temperature:"+result.temperature);
+       // console.log("got temperature:"+result.temperature);
 
        if (result.error && result.error != "unknown sid") {
          console.log("got error:"+result.error);
@@ -53,8 +65,14 @@
          var myToggle = $("#switch").data('toggles');
          myToggle.toggle(true, false, true);
          $("#runtime").show();
-         $("#runtime").empty();
-         $("#runtime").append("<h3>"+result.end_time+"</h3>");
+         $("#until").empty();
+         $("#remain").empty();
+         var endTime = new Date();
+         
+         var remain = (new Date(result.end_time * 1000)).toUTCString().match(/(\d\d:\d\d:\d\d)/)[0];
+         endTime.setSeconds(endTime.getSeconds()+result.end_time);
+         $("#until").append(convertTo24Hour(endTime.toLocaleTimeString()));
+         $("#remain").append(remain);
        }
 
        if ($.cookie("sid")) {
@@ -173,7 +191,10 @@
     <div id="temperature">
     </div>
 
-    <div id="runtime"></div>
+    <div id="runtime">
+      <div class="line">Off at: <span id="until"></span></div>
+      <div class="line">Remaining: <span id="remain"></span></div>
+    </div>
 
     <div id="controls">
       <div id="switchboard">
