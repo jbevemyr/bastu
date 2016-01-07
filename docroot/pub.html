@@ -123,7 +123,7 @@
      }
 
      $("#send-login").click(function() {
-       var user = $("#user").val();
+       var user = $("#user").val().toLowerCase();
        var password = $("#password").val();
        var remember = $("#remember").attr("checked");
 
