@@ -51,18 +51,21 @@ handle_call(Request, _From, S) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({reply, Id, Res}, State) ->
-    Json = lists:flatten(json2:encode(Res)),
-    case url:post(?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++Id, Json) of
-        {200, _Header, Body} ->
+handle_info({reply, RId, Res}, State) ->
+    ?liof("retry ~p ~p\n", [RId, Res]),
+    Json = lists:flatten(json2:encode(to_string(Res))),
+    case url:post(?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId, Json) of
+        {200, _Header, Body0} ->
+	    Body=lists:flatten(Body0),
+	    ?liof("Body=~p\n", [Body]),
             case json2:decode_string(Body) of
                 {ok, "nowork"} ->
-                    ?liof("nothing to do\n", []),
+                    %% ?liof("nothing to do\n", []),
                     self() ! retry;
                 {ok, {struct, Args}} ->
                     Rpc = get_opt("rpc", Args, "noop"),
                     Id = get_opt("id", Args, "noref"),
-                    ?liof("Got work Json from server: ~p\n", [Json]),
+                    %% ?liof("Got work Json from server: ~p\n", [Json]),
                     do_rpc(Rpc, Id);
                 Other ->
                     error_logger:format("got error when decoding json: ~p\n",
@@ -83,14 +86,19 @@ handle_info({reply, Id, Res}, State) ->
     {noreply, State};
 
 handle_info(retry, State) ->
+    ?liof("retry\n", []),
     case url:get(?PUBSERVER++"/bastu_pub/get-work?dev="++State#state.id) of
-        {200, _Header, Body} ->
+        {200, _Header, Body0} ->
+	    Body = lists:flatten(Body0),
+	    ?liof("Body=~p\n", [Body]),
             case json2:decode_string(Body) of
                 {ok, {struct, Args}} ->
                     Rpc = get_opt("rpc", Args, "noop"),
                     Id = get_opt("id", Args, "noref"),
                     ?liof("Got work from server: ~p:~p\n", [Rpc, Id]),
                     do_rpc(Rpc, Id);
+		{ok, "nowork"} ->
+                    self() ! retry;
                 Other ->
                     error_logger:format("got error when decoding json: ~p\n",
                                         [Other]),
@@ -135,8 +143,8 @@ get_id() ->
 get_hw([]) ->
     %% dummy
     [1,2,3,4,5,6];
-get_hw([If|Ifs]) ->
-    case lists:keysearch(1, hwaddr, If) of
+get_hw([{_,If}|Ifs]) ->
+    case lists:keysearch(hwaddr, 1, If) of
         {value, {_, [0,0,0,0,0,0]}} ->
             get_hw(Ifs);
         {value, {_, Hw}} ->
@@ -152,3 +160,15 @@ get_opt(Tag, [{Tag, Value}|_Rest], _Default) ->
 get_opt(Tag, [_Opt|Rest], Default) ->
     get_opt(Tag, Rest, Default).
 
+
+to_string(A) when is_atom(A) ->
+    ?a2l(A);
+to_string(B) when is_binary(B) ->
+    ?b2l(B);
+to_string(T) ->
+    T.
+
+
+
+
+    

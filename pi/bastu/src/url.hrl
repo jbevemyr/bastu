@@ -21,7 +21,7 @@
 -record(http, {location,
 	       other = []}).
 
--record(hurl_opts, {timeout  = 5000,
+-record(hurl_opts, {timeout  = 1000*60*5,
 		    sockopts = [],
 		    dns_env}).
 
