@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" itemscope itemtype="http://schema.org/Article">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="jquery-ui.min.css" rel="stylesheet" type="text/css">
+  <link href="default.css" rel="stylesheet" type="text/css">
+  <script src="jquery-2.1.4.js"></script>
+  <script src="jquery.cookie.js"></script>
+  <script src="jquery-ui.min.js"></script>
+  <script src="support.js"></script>
+
+  <script>
+
+   var me = {};
+   var users = [];
+   var addUser;
+
+   function tools(user) {
+     var name=user.username;
+     return ("<div user=\""+name+" class=\"button edit\">Edit</div>"+
+             "<div user=\""+name+" class=\"button delete\">Delete</div>");
+   }
+
+   function getUnclaimed() {
+
+     pubServerGet("unclaimed").then(
+       function(res) {
+         setTimeout(getUnclaimed, 3000);
+
+         $("#unclaimed h3").empty();
+
+         if (res.error)
+           return;
+
+         if (res.length == 0) {
+           $("#unclaimed h3").append("No unclaimed devices at this point");
+         }
+         else {
+           $("#unclaimed h3").append("Unclaimed devices");
+         }
+
+         $("#unclaimed table tbody").empty();
+         res.forEach(function(dev) {
+           $("#unclaimed table tbody").append(
+             "<tr><td>"+dev+"</td></tr>"
+           );
+         });
+
+       });
+
+   }
+
+   function fetchUsers() {
+     pubServerGet("get_all_users").then(
+       function(res) {
+         $("#users table tbody").empty();
+         if (res.error) {
+           console.log("got an error while fetching users:"+res.error);
+           if (res.error == "unknown sid") {
+             $("#login").show();
+             $("#page").hide();
+           }
+         }
+         else {
+           users = res;
+
+           users.forEach(function(user) {
+             var email = "";
+             var name = "";
+             if (user.name) name=user.name;
+             if (user.email) email=user.email;
+             var roleEntry;
+
+             if (me.role == "admin")
+               roleEntry = "<td class=editable key=role>"+user.role+"</td>";
+             else
+               roleEntry = "<td>"+user.role+"</td>";
+
+             $("#users table tbody").append(
+               ("<tr user=\""+user.username+"\">"+
+                "<td>"+user.username+"</td>"+
+                "<td class=editable key=name>"+name+"</td>"+
+                "<td class=editable key=email>"+email+"</td>"+
+                roleEntry +
+                "<td class=editablepass>"+user.password+"</td>"+
+                "<td class=editable key=device>"+user.device+"</td>"+
+                "<td class=editable key=comment>"+user.comment+"</td>"+
+                "<td><div class=clear>"+
+                "  <span></span>"+
+                "  <span></span>"+
+                "</div></td>"+
+                "</tr>"
+               ));
+           });
+
+           $("#reset").hide();
+           $("#save").hide();
+
+           $(".editable").click(function(e) {
+             e.preventDefault();
+             e.stopImmediatePropagation();
+             if ($(this).data('editing')) return;
+
+             var val = $(this).text();
+             $(this).empty();
+             $(this).data('editing', true);
+             $(this).data('oldval', val);
+             $('<input type="text" class="editfield">').
+               val(val).appendTo($(this)).focus();
+
+             $('#users input').bind('keyup', function(e) {
+               if (e.which == 13) {
+                 e.preventDefault();
+                 $("#save").click();
+               }
+             });
+
+             $("#reset").show();
+             $("#save").show();
+           });
+
+           $(".editablepass").click(function(e) {
+             e.preventDefault();
+             e.stopImmediatePropagation();
+             if ($(this).data('editing')) return;
+
+             var val = $(this).text();
+             $(this).empty();
+             $(this).data('editing', true);
+             $(this).data('oldval', val);
+             $('<input type="password" class="editpass">').
+              val("").appendTo($(this)).focus();
+
+             $('#users input').bind('keyup', function(e) {
+               if (e.which == 13) {
+                 e.preventDefault();
+                 $("#save").click();
+               }
+             });
+
+             $("#reset").show();
+             $("#save").show();
+           });
+
+           $("#users .clear").click(function(e) {
+             e.preventDefault();
+             e.stopImmediatePropagation();
+             var user = $(this).closest('tr').attr("user");
+             console.log("deleting user: "+user);
+             $("#dialog-confirm").dialog({
+               resizable:false,
+               modal: true,
+               title: "Delete user?",
+               height: 200,
+               width: 300,
+               buttons: {
+                 "Delete User": function() {
+                   console.log("delete confirmed: "+user);
+                   $(this).dialog("close");
+                   pubServerGet("del_user", "username="+user).then(
+                     function(res) {
+                       fetchUsers();
+                     });
+                 },
+                 "Cancel": function() {
+                   console.log("delete canceled");
+                   $(this).dialog("close");
+                 }
+               }
+             });
+           });
+
+           // $("#users table tr").prop("onclick", null).off('click');
+           // $("#users table tr").click(function() {
+           //   var user = $(this).attr("user");
+           //   console.log("selected user:"+user);
+           // });
+         }
+       }
+     );
+   }
+
+   function login() {
+     var user = $("#user").val().toLowerCase();
+     var password = $("#password").val();
+     var remember = $("#remember").attr("checked");
+
+     pubServerLogin(user, password, remember).then(
+       function(res) {
+         if (res.error) {
+           console.log("login failed:"+res.error);
+           alert(res.error);
+           $("#login").show();
+           $("#page").hide();
+         }
+         else {
+           console.log("login successful: sid="+res.sid);
+           $("#login").hide();
+           $("#page").show();
+           pubServerGet("get_user").then(
+             function(res) {
+               me = res;
+               if (me.role == "admin") {
+                 $("#add").show();
+                 $("#admin-header").show();
+               } else {
+                 $("#add").hide();
+                 $("#admin-header").hide();
+               }
+
+               fetchUsers();
+             }
+           );
+         }
+       });
+   }
+
+   function setup() {
+     $("#dialog-confirm").hide();
+     $("#dialog-add").hide();
+
+     if ($.cookie("sid")) {
+       $("#login").hide();
+       $("#page").show();
+
+       pubServerGet("get_user").then(
+         function(res) {
+           me = res;
+           if (me.role == "admin") {
+             $("#add").show();
+             $("#admin-header").show();
+           }
+           else {
+             $("#add").hide();
+             $("#admin-header").hide();
+           }
+         }
+       );
+
+       fetchUsers();
+     }
+     else {
+       $("#login").show();
+       $("#page").hide();
+     }
+
+     $("#send-login").click(function() {
+       login();
+     });
+
+     $("#add").click(function() {
+       if (addUser == null) {
+         addUser = $("#dialog-add").dialog({
+           resizable:false,
+           modal: true,
+           title: "Add a new user",
+           height: 250,
+           width: 300,
+           buttons: {
+             "Cancel": function() {
+               $(this).dialog("close");
+             },
+             "Add User": function() {
+               $(this).submit();
+             }
+           }
+         });
+
+         addUser.submit(function() {
+           console.log("add user submit");
+           var user = $("#add-user").val();
+           var pass = $("#add-pass").val();
+           $(this).dialog("close");
+           pubServerGet("add_user",
+                        "username="+user+"&"+
+                        "password="+pass
+           ).then(
+             function(res) {
+               console.log("res="+res);
+               if (res.error) {
+                 alert(res.error);
+               }
+               fetchUsers();
+             });
+         });
+       }
+       else {
+         addUser.dialog("open");
+       }
+     });
+
+     $("#reset").click(function() {
+       $("#users .editable, .editablepass").each(function() {
+         if ($(this).data('editing')) {
+           var val = $(this).data('oldval');
+           var td = $(this).closest('td');
+           td.empty().html(val).data('editing',false);
+         }
+       });
+       $("#reset").hide();
+       $("#save").hide();
+     });
+
+     $("#save").click(function() {
+       $("#users .editpass").each(function() {
+         var passwd = $(this).val();
+         var td = $(this).closest('td');
+         var tr = $(this).closest('tr');
+         var user = tr.attr("user");
+         console.log("setting user password: "+user);
+         td.empty().html("xxxx").data('editing',false);
+         if (passwd != "") {
+           pubServerGet("set_user_password",
+                        "username="+user+"&new_password="+
+                        passwd).then(
+                          function() {
+                            fetchUsers();
+                          });
+         }
+       });
+       $("#users .editfield").each(function() {
+         var td = $(this).closest('td');
+         var tr = $(this).closest('tr');
+         var user = tr.attr("user");
+         var key = td.attr("key");
+         var val = $(this).val();
+         console.log("saving user: "+user+" key: "+key+" val: "+val);
+         pubServerGet("set_named_user",
+                      "username="+user+"&"+
+                      key+"="+val).then(
+                        function() {
+                          fetchUsers();
+                        });
+         td.empty().html(val).data('editing',false);
+       });
+       $("#reset").hide();
+       $("#save").hide();
+     });
+
+     $("#logout").click(function() {
+       $.removeCookie('sid', { path: '/' });
+       $("#login").show();
+       $("#page").hide();
+     });
+
+     $("#control").click(function() {
+       window.location = "index.html";
+     });
+
+     $('#user, #password').bind('keyup', function(e) {
+       if (e.which == 13) {
+         e.preventDefault();
+         login();
+       }
+     });
+
+     $('#dialog-add input').bind('keyup', function(e) {
+       if (e.which == 13) {
+         console.log("adduser key up");
+         e.preventDefault();
+         e.stopImmediatePropagation();
+         var user = $("#add-user").val();
+         var pass = $("#add-pass").val();
+         addUser.dialog("close");
+         pubServerGet("add_user",
+                      "username="+user+"&"+
+                      "password="+pass
+         ).then(
+           function(res) {
+             console.log("res="+res);
+             if (res.error) {
+               alert(res.error);
+             }
+             fetchUsers();
+           });
+       }
+     });
+
+     getUnclaimed();
+   }
+  </script>
+</head>
+
+<body onload="setup()">
+
+  <div id="page">
+    <h3 id="admin-header">Users</h3>
+    <div id="users">
+      <table>
+        <thead>
+          <tr>
+            <th>Id</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Password</th>
+            <th>Device</th>
+            <th>Comment</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="dialog-confirm">Permanently remove user from site?</div>
+
+    <div id="dialog-add">
+      <form submit="#" autocomplete="off">
+        <table>
+          <tr>
+            <td>
+              User ID
+            </td>
+            <td>
+              <input type="text" name="user" id="add-user" placeholder="ID"
+                     autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Password
+            </td>
+            <td>
+              <input type="password" name="pass" id="add-pass"
+                     autocomplete=”off”>
+            </td>
+          </tr>
+        </table>
+      </form>
+    </div>
+
+    <div class="button" id="add">
+      Add User
+    </div>
+    <div class="button" id="reset">
+      Reset
+    </div>
+    <div class="button" id="save">
+      Save
+    </div>
+
+    <div id="unclaimed">
+      <h3>Unclaimed devices</h3>
+      <table>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="button" id="logout">
+      Logout
+    </div>
+
+    <div class="button" id="control">
+      Control
+    </div>
+
+  </div>
+
+  <div id="login">
+    <h3>Login</h3>
+    <div class="line">
+      <div class="title">User</div>
+      <input type="text" id="user" placeholder="USERNAME"/>
+    </div>
+    <div class="line">
+      <div class="title">Password</div>
+      <input type="password" id="password" autocomplete=”off”/>
+    </div>
+    <div class="line">
+      <input type="checkbox" id="remember" placeholser="PASSWORD"/>
+      <label for="remember">Keep me logged in</label>
+    </div>
+
+    <div class="button" id="send-login">
+      Login
+    </div>
+  </div>
+
+</body>
+</html>
