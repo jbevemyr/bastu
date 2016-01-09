@@ -72,11 +72,12 @@ function serverGetPasswd(key, password) {
   return makeJSONRequest(opts);
 }
 
-function pubServerGet(key) {
+function pubServerGet(key, query) {
   var opts =
          { method: "GET",
            url: "http://"+location.hostname+"/bastu_pub/"+key,
          };
+    if (query) opts["query"]=query;
   return makeJSONRequest(opts);
 }
 

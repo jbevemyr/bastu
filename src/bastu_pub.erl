@@ -208,7 +208,7 @@ do_op(Cmd, L, Json, Arg) ->
           passwd_reset_id = [],   %% string() - password reset id
           passwd_reset_send_time=0, %% date_time() - send time time of last
                                     %% password reset email
-          device,                 %% device id
+          device=[],              %% device id
           comment=[],             %% info on reverse ssh port, for example
           data=[]                 %% [{string(), string()}]
          }).
@@ -355,13 +355,17 @@ do_cmd("send_reset_password", L, _Json, _A, S) ->
             smtp:send(?MAILSERVER, ?EMAIL_SENDER, [User],
                       "Password reset request",
                       "You have requested a password reset. Follow the link\n"
-                      "below to reset the password. Ignore this email if you haven't\n"
+                      "below to reset the password. Ignore this email if you "
+                      "haven't\n"
                       "requested a reset.",
-                      "http://bastu.gt16.se/reset_password.html?rpid="++RPid, []),
+                      "http://bastu.gt16.se/reset_password.html?rpid="++RPid,
+                      []),
             %% Note that the reset_password.html page should make a AJAX call to
-            %% the reset_password?rpdi=<rpid from post to .html page>&password=<new password>
+            %% the reset_password?rpdi=<rpid from post to .html
+            %% page>&password=<new password>
             Res = {struct, [{state, "ok"}]},
-            NewUser = U#user{passwd_reset_id=RPid, passwd_reset_send_time=gnow()},
+            NewUser = U#user{passwd_reset_id=RPid,
+                             passwd_reset_send_time=gnow()},
             NewUsers = update_user(NewUser, S#state.users),
             NewS = S#state{users=NewUsers};
         _ ->
@@ -384,7 +388,8 @@ do_cmd("reset_password", L, _Json, _A, S) ->
                     Res = {struct, [{user, user2object(U)}]},
                     {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
                true ->
-                    Res = {struct, [{error, "password reset link has expired"}]},
+                    Res = {struct,
+                           [{error, "password reset link has expired"}]},
                     {{Res, []}, S}
             end;
         _ ->
@@ -428,6 +433,11 @@ do_cmd("set_user_password", L, _Json, A, S) ->
                     Res = {struct, [{error, "unknown user"}]},
                     {{Res, []}, S}
             end;
+        U=#user{} when U#user.username == Username ->
+            NewU = U#user{password=Md5NewPass},
+            Res = {struct, [{status, "ok"}]},
+            NewS = S#state{users=update_user(NewU, S#state.users)},
+            {{Res, []}, NewS};
         #user{} ->
             Res = {struct, [{error, "only allowed for admin user"}]},
             {{Res,[]}, S};
@@ -440,10 +450,12 @@ do_cmd("set_user_password", L, _Json, A, S) ->
 do_cmd("get_all_users", L, _Json, A, S) ->
     Sid = get_sid(A,L),
     case get_user_by_id(Sid, S) of
-        #user{} ->
+        User=#user{} when User#user.role == admin ->
             %% login successful
-            Res = {struct, [{users, {array, [user2object(U) ||
-                                                U <- S#state.users]}}]};
+            Res = {array, [user2object(U) || U <- S#state.users]};
+        User=#user{} ->
+            %% login successful
+            Res = {array, [user2object(User)]};
         _ ->
             Res = {struct, [{error,"unknown sid"}]}
     end,
@@ -455,7 +467,7 @@ do_cmd("get_user", L, _Json, A, S) ->
     case get_user_by_id(Sid, S) of
         U=#user{} ->
             %% login successful
-            Res = {struct, [{user, user2object(U)}]};
+            Res = user2object(U);
         _ ->
             Res = {struct, [{error,"unknown sid"}]}
     end,
@@ -469,7 +481,7 @@ do_cmd("get_named_user", L, _Json, A, S) ->
             Username = get_val("username", L, ""),
             case get_user_by_name(Username, S) of
                 OU=#user{} ->
-                    Res = {struct, [{user, user2object(OU)}]};
+                    Res = user2object(OU);
                 false ->
                     Res = {struct, [{error, "unknown user"}]}
             end;
@@ -486,8 +498,8 @@ do_cmd("set_user", L, Json, A, S) ->
     case get_user_by_id(Sid, S) of
         U=#user{} ->
             %% login successful
-            U2 = apply_user_ops(U,L),
-            NewU = apply_user_json(U2, Json),
+            U2 = apply_user_ops(U,L,U),
+            NewU = apply_user_json(U2, Json,U),
             Res = {struct, [{status, "ok"}]},
             {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
         _ ->
@@ -498,19 +510,24 @@ do_cmd("set_user", L, Json, A, S) ->
 %% http://bastu.gt16.se/bastu/set_user?username=bar
 do_cmd("set_named_user", L, Json, A, S) ->
     Sid = get_sid(A,L),
+    Username = get_val("username", L, ""),
     case get_user_by_id(Sid, S) of
         U=#user{} when U#user.role == admin ->
-            Username = get_val("username", L, ""),
             case get_user_by_name(Username, S) of
                 OU=#user{} ->
-                    U2 = apply_user_ops(OU,L),
-                    NewU = apply_user_json(U2, Json),
+                    U2 = apply_user_ops(OU,L,U),
+                    NewU = apply_user_json(U2, Json,U),
                     Res = {struct, [{status, "ok"}]},
                     NewS = S#state{users=update_user(NewU, S#state.users)};
                 false ->
                     NewS = S,
                     Res = {struct, [{error, "unknown user"}]}
             end;
+        U=#user{} when U#user.username == Username ->
+            U2 = apply_user_ops(U,L,U),
+            NewU = apply_user_json(U2, Json,U),
+            Res = {struct, [{status, "ok"}]},
+            NewS = S#state{users=update_user(NewU, S#state.users)};
         #user{} ->
             NewS = S,
             Res = {struct, [{error, "only allowed for admin user"}]};
@@ -520,7 +537,8 @@ do_cmd("set_named_user", L, Json, A, S) ->
     end,
     {{Res, []}, NewS};
 
-%% http://bastu.gt16.se/bastu/add_user?username=jb&password=test&role=user&foo=bar
+%% http://bastu.gt16.se/bastu/add_user?username=jb&
+%% password=test&role=user&foo=bar
 do_cmd("add_user", L0, Json, A, S) ->
     Sid = get_sid(A, L0),
     L = merge_attrs(L0, Json),
@@ -537,9 +555,6 @@ do_cmd("add_user", L0, Json, A, S) ->
                Password == "" ->
                     NewS = S,
                     Res = {struct, [{error, "invalid password"}]};
-               Role == "" ->
-                    NewS = S,
-                    Res = {struct, [{error, "invalid role"}]};
                Exists ->
                     NewS = S,
                     Res = {struct, [{error, "a user with the same name "
@@ -550,7 +565,7 @@ do_cmd("add_user", L0, Json, A, S) ->
                                password=Md5Pass,
                                sid=mk_id(S),
                                role=?l2a(Role)},
-                    NewU = apply_user_json(U2, Json),
+                    NewU = apply_user_json(U2, Json,U),
                     store_users([NewU|S#state.users]),
                     Res = {struct, [{status, "ok"}]},
                     NewS = S#state{users=[NewU|S#state.users]}
@@ -563,15 +578,15 @@ do_cmd("add_user", L0, Json, A, S) ->
             NewS = S,
             Res = {struct, [{error, "unknown sid"}]}
     end,
+    ?liof("Res=~p\n", [Res]),
     {{Res, []}, NewS};
 
 %% http://bastu.gt16.se/bastu/del_user?username=jb
 do_cmd("del_user", L, _Json, A, S) ->
     Sid = get_sid(A,L),
+    Username = get_val("username", L, ""),
     case get_user_by_id(Sid, S) of
         U=#user{} when U#user.role == admin ->
-            %% login successful
-            Username = get_val("username", L, ""),
             DelUser = get_user_by_name(Username, S),
             if Username == "" ->
                     NewS = S,
@@ -585,6 +600,11 @@ do_cmd("del_user", L, _Json, A, S) ->
                     Res = {struct, [{status, "ok"}]},
                     NewS = S#state{users=NewUsers}
             end;
+        U=#user{} when U#user.username == Username ->
+            NewUsers = lists:delete(U, S#state.users),
+            store_users(NewUsers),
+            Res = {struct, [{status, "ok"}]},
+            NewS = S#state{users=NewUsers};
         #user{} ->
             %% login successful
             NewS = S,
@@ -601,12 +621,9 @@ do_cmd("get_status", L, _Json, Arg, S) ->
         U=#user{} ->
             Res =
                 try
-                    {ok, Temp} = call_device(U, "get_temp"),
+                    {ok, Temp}   = call_device(U, "get_temp"),
                     {ok, Status} = call_device(U, "get_status"),
                     {ok, EndsAt} = call_device(U, "get_end_time"),
-                    %% Temp = gen_server:call({bastu, 'bastu@bastu'}, get_temp),
-                    %% Status = gen_server:call({bastu, 'bastu@bastu'}, get_status),
-                    %% EndsAt = gen_server:call({bastu, 'bastu@bastu'}, get_end_time),
                     {struct, [{"temperature", Temp},
                               {"status", Status},
                               {"end_time", EndsAt}]}
@@ -673,6 +690,21 @@ do_cmd("switch_off", L, _Json, Arg, S) ->
         _ ->
             Res = {struct, [{error, "unknown sid"}]}
     end,
+    {{Res,[]}, S};
+
+do_cmd("unclaimed", L, _Json, Arg, S) ->
+    Sid = get_sid(Arg, L),
+    case get_user_by_id(Sid, S) of
+        #user{} ->
+            Ids = gen_server:call(comet, get_ids),
+            Unclaimed = [Id || Id <- Ids,
+                               not(lists:keymember(Id, #user.device,
+                                                   S#state.users))],
+            Res = {array, Unclaimed};
+        _ ->
+            Res = {struct, [{error, "unknown sid"}]}
+    end,
+    ?liof("Res=~p\n", [Res]),
     {{Res,[]}, S};
 
 do_cmd(Unknown, _L, _Json, _Arg, S) ->
@@ -908,6 +940,7 @@ user2object(U) ->
       {"confirmed", U#user.confirmed},
       {"role", ?a2l(U#user.role)},
       {"comment", U#user.comment},
+      {"device", U#user.device},
       {"passwd_reset_id", U#user.passwd_reset_id},
       {"passwd_reset_send_time", U#user.passwd_reset_send_time}|
       U#user.data]}.
@@ -946,32 +979,38 @@ object2user(U, [Unknown|Props], Data) ->
     error_logger:format("unknown user property ~p", [Unknown]),
     object2user(U, Props, Data).
 
-apply_user_ops(U, []) ->
+apply_user_ops(U, [], _AUser) ->
     U;
-apply_user_ops(U, [{"sid", _}|Ops]) ->
-    apply_user_ops(U, Ops);
-apply_user_ops(U, [{"password", _}|Ops]) ->
-    apply_user_ops(U, Ops);
-apply_user_ops(U, [{"username", _}|Ops]) ->
-    apply_user_ops(U, Ops);
-apply_user_ops(U, [{"passwd_reset_id", _}|Ops]) ->
-    apply_user_ops(U, Ops);
-apply_user_ops(U, [{"passwd_reset_send_time", _}|Ops]) ->
-    apply_user_ops(U, Ops);
-apply_user_ops(U, [{"role", NewRole}|Ops]) ->
-    if U#user.role == admin ->
-            apply_user_ops(U#user{role=?a2l(NewRole)}, Ops);
+apply_user_ops(U, [{"sid", _}|Ops], AUser) ->
+    apply_user_ops(U, Ops, AUser);
+apply_user_ops(U, [{"password", _}|Ops], AUser) ->
+    apply_user_ops(U, Ops, AUser);
+apply_user_ops(U, [{"username", _}|Ops], AUser) ->
+    apply_user_ops(U, Ops, AUser);
+apply_user_ops(U, [{"passwd_reset_id", _}|Ops], AUser) ->
+    apply_user_ops(U, Ops, AUser);
+apply_user_ops(U, [{"passwd_reset_send_time", _}|Ops], AU) ->
+    apply_user_ops(U, Ops, AU);
+apply_user_ops(U, [{"device", Dev}|Ops], AU) ->
+    apply_user_ops(U#user{device=Dev}, Ops, AU);
+apply_user_ops(U, [{"comment", Dev}|Ops], AU) ->
+    apply_user_ops(U#user{comment=Dev}, Ops, AU);
+apply_user_ops(U, [{"role", NewRole}|Ops], AU) ->
+    if AU#user.role == admin ->
+            apply_user_ops(U#user{role=?l2a(NewRole)}, Ops, AU);
        true ->
-            apply_user_ops(U, Ops)
+            apply_user_ops(U, Ops, AU)
     end;
-apply_user_ops(U, [{Key,Value}|Ops]) ->
+apply_user_ops(U, [{Key,Value}|Ops], AU) ->
     Data = lists:keydelete(Key, 1, U#user.data),
-    apply_user_ops(U#user{data=[{Key, Value}|Data]}, Ops);
-apply_user_ops(U, [_|Ops]) ->
-    apply_user_ops(U, Ops).
+    apply_user_ops(U#user{data=[{Key, Value}|Data]}, Ops, AU);
+apply_user_ops(U, [_|Ops], AU) ->
+    apply_user_ops(U, Ops, AU).
 
-apply_user_json(U, {struct, Ops}) ->
-    apply_user_ops(U, Ops).
+apply_user_json(U, {struct, Ops}, AU) ->
+    apply_user_ops(U, Ops, AU);
+apply_user_json(U, _, _AU) ->
+    U.
 
 %
 
