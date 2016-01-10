@@ -145,13 +145,13 @@ out(A) ->
 do_op("get-work", L, Json, _Arg) ->
     try
         Dev = get_val("dev", L, ""),
-        ?liof("get-work ~p\n", [Dev]),
+        %% ?liof("get-work ~p\n", [Dev]),
         case gen_server:call(comet, {get_work, Dev}, infinity) of
             nowork ->
-                ?liof("no work for ~p\n", [Dev]),
+                %% ?liof("no work for ~p\n", [Dev]),
                 rpcreply({"nowork", []});
             {Rpc, RpcRef} ->
-                ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
+                %% ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
                 rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
     catch X:Y ->
@@ -166,13 +166,13 @@ do_op("reply", L, Json, _Arg) ->
     try
         Dev = get_val("dev", L, ""),
         Id = get_val("id", L, ""),
-        ?liof("reply ~p ~p\n~p\n", [Dev, Id, Json]),
+        %% ?liof("reply ~p ~p\n~p\n", [Dev, Id, Json]),
         case gen_server:call(comet, {reply, Dev, Json, Id}, infinity) of
             nowork ->
-                ?liof("no work for ~p\n", [Dev]),
+                %% ?liof("no work for ~p\n", [Dev]),
                 rpcreply({"nowork", []});
             {Rpc, RpcRef} ->
-                ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
+                %% ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
                 rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
     catch
@@ -268,11 +268,10 @@ handle_call(hard_reset, _From, S) ->
 handle_call(stop, _From, S) ->
     {stop, normal, S};
 
-handle_call({Cmd, L, Json, Arg}, _From, S) ->
+handle_call({Cmd, L, Json, Arg}, From, S) ->
     try
         %% ?liof("Json=~p\n", [Json]),
-        {Res, NewS} = do_cmd(Cmd, L, Json, Arg, S),
-        {reply, Res, NewS}
+        do_cmd(Cmd, L, Json, Arg, From, S)
     catch
         X:Y ->
             error_logger:format(
@@ -319,7 +318,7 @@ code_change(_OldVsn, S, _Extra) ->
 %%%----------------------------------------------------------------------
 
 %% http://bastu.gt16.se/bastu/login?user=johan&password=test
-do_cmd("login", L, _Json, _A, S) ->
+do_cmd("login", L, _Json, _A, _From, S) ->
     User = get_val("user", L, ""),
     Password = get_val("password", L, ""),
     Remember = get_val("remember", L, "false"),
@@ -344,10 +343,10 @@ do_cmd("login", L, _Json, _A, S) ->
             Headers=[],
             Res = {struct, [{error, "unknown user"}]}
     end,
-    {{Res,Headers}, S};
+    {reply, {Res,Headers}, S};
 
 %% http://bastu.gt16.se/bastu/send_reset_password?user=johan
-do_cmd("send_reset_password", L, _Json, _A, S) ->
+do_cmd("send_reset_password", L, _Json, _A, _From, S) ->
     User = get_val("user", L, ""),
     case get_user_by_name(User, S) of
         U=#user{} ->
@@ -372,10 +371,10 @@ do_cmd("send_reset_password", L, _Json, _A, S) ->
             Res = {struct, [{state, "error"}, {reason, "unknown user"}]},
             NewS = S
     end,
-    {{Res,[]}, NewS};
+    {reply, {Res,[]}, NewS};
 
 %% http://bastu.gt16.se/bastu/reset_password?rpid=1234567890&password=test
-do_cmd("reset_password", L, _Json, _A, S) ->
+do_cmd("reset_password", L, _Json, _A, _From, S) ->
     Rpid = get_val("rpid", L, ""),
     Password = get_val("password", L, ""),
     case get_user_by_rpid(Rpid, S) of
@@ -390,15 +389,15 @@ do_cmd("reset_password", L, _Json, _A, S) ->
                true ->
                     Res = {struct,
                            [{error, "password reset link has expired"}]},
-                    {{Res, []}, S}
+                    {reply, {Res, []}, S}
             end;
         _ ->
             Res = {struct, [{error, "unknown sid"}]},
-            {{Res, []}, S}
+            {reply, {Res, []}, S}
     end;
 
 %% http://bastu.gt16.se/bastu/set_password?old_password=test&new_password=test2
-do_cmd("set_password", L, _Json, A, S) ->
+do_cmd("set_password", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     OldPass = get_val("old_password", L, ""),
     NewPass = get_val("new_password", L, ""),
@@ -409,14 +408,14 @@ do_cmd("set_password", L, _Json, A, S) ->
             %% successful auth of old pass
             NewU = U#user{password=Md5NewPass},
             Res = {struct, [{status, "ok"}]},
-            {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
+            {reply, {Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
         _ ->
             Res = {struct, [{error, "unknown sid"}]},
-            {{Res, []}, S}
+            {reply, {Res, []}, S}
     end;
 
 %% http://bastu.gt16.se/bastu/set_user_password?username=jb&password=test
-do_cmd("set_user_password", L, _Json, A, S) ->
+do_cmd("set_user_password", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     Username = get_val("username", L, ""),
     NewPass = get_val("new_password", L, ""),
@@ -428,26 +427,26 @@ do_cmd("set_user_password", L, _Json, A, S) ->
                     NewU = OU#user{password=Md5NewPass},
                     Res = {struct, [{status, "ok"}]},
                     NewS = S#state{users=update_user(NewU, S#state.users)},
-                    {{Res, []}, NewS};
+                    {reply, {Res, []}, NewS};
                 false ->
                     Res = {struct, [{error, "unknown user"}]},
-                    {{Res, []}, S}
+                    {reply, {Res, []}, S}
             end;
         U=#user{} when U#user.username == Username ->
             NewU = U#user{password=Md5NewPass},
             Res = {struct, [{status, "ok"}]},
             NewS = S#state{users=update_user(NewU, S#state.users)},
-            {{Res, []}, NewS};
+            {reply, {Res, []}, NewS};
         #user{} ->
             Res = {struct, [{error, "only allowed for admin user"}]},
-            {{Res,[]}, S};
+            {reply, {Res,[]}, S};
         _ ->
             Res = {struct, [{error,"unknown sid"}]},
-            {{Res,[]}, S}
+            {reply, {Res,[]}, S}
     end;
 
 %% http://bastu.gt16.se/bastu/get_all_users
-do_cmd("get_all_users", L, _Json, A, S) ->
+do_cmd("get_all_users", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     case get_user_by_id(Sid, S) of
         User=#user{} when User#user.role == admin ->
@@ -459,10 +458,10 @@ do_cmd("get_all_users", L, _Json, A, S) ->
         _ ->
             Res = {struct, [{error,"unknown sid"}]}
     end,
-    {{Res,[]}, S};
+    {reply, {Res,[]}, S};
 
 %% http://bastu.gt16.se/bastu/get_user
-do_cmd("get_user", L, _Json, A, S) ->
+do_cmd("get_user", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     case get_user_by_id(Sid, S) of
         U=#user{} ->
@@ -471,10 +470,10 @@ do_cmd("get_user", L, _Json, A, S) ->
         _ ->
             Res = {struct, [{error,"unknown sid"}]}
     end,
-    {{Res, []}, S};
+    {reply, {Res, []}, S};
 
 %% http://bastu.gt16.se/bastu/get_named_user?username=jb
-do_cmd("get_named_user", L, _Json, A, S) ->
+do_cmd("get_named_user", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     case get_user_by_id(Sid, S) of
         U=#user{} when U#user.role == admin ->
@@ -490,10 +489,10 @@ do_cmd("get_named_user", L, _Json, A, S) ->
         _ ->
             Res = {struct, [{error, "unknown sid"}]}
     end,
-    {{Res,[]}, S};
+    {reply, {Res,[]}, S};
 
 %% http://bastu.gt16.se/bastu/set_user
-do_cmd("set_user", L, Json, A, S) ->
+do_cmd("set_user", L, Json, A, _From, S) ->
     Sid = get_sid(A,L),
     case get_user_by_id(Sid, S) of
         U=#user{} ->
@@ -501,14 +500,14 @@ do_cmd("set_user", L, Json, A, S) ->
             U2 = apply_user_ops(U,L,U),
             NewU = apply_user_json(U2, Json,U),
             Res = {struct, [{status, "ok"}]},
-            {{Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
+            {reply, {Res,[]}, S#state{users=update_user(NewU, S#state.users)}};
         _ ->
             Res = {struct, [{error, "unknown sid"}]},
-            {{Res, []}, S}
+            {reply, {Res, []}, S}
     end;
 
 %% http://bastu.gt16.se/bastu/set_user?username=bar
-do_cmd("set_named_user", L, Json, A, S) ->
+do_cmd("set_named_user", L, Json, A, _From, S) ->
     Sid = get_sid(A,L),
     Username = get_val("username", L, ""),
     case get_user_by_id(Sid, S) of
@@ -535,11 +534,11 @@ do_cmd("set_named_user", L, Json, A, S) ->
             NewS = S,
             Res = {struct, [{error, "unknown sid"}]}
     end,
-    {{Res, []}, NewS};
+    {reply, {Res, []}, NewS};
 
 %% http://bastu.gt16.se/bastu/add_user?username=jb&
 %% password=test&role=user&foo=bar
-do_cmd("add_user", L0, Json, A, S) ->
+do_cmd("add_user", L0, Json, A, _From, S) ->
     Sid = get_sid(A, L0),
     L = merge_attrs(L0, Json),
     case get_user_by_id(Sid, S) of
@@ -579,10 +578,10 @@ do_cmd("add_user", L0, Json, A, S) ->
             Res = {struct, [{error, "unknown sid"}]}
     end,
     ?liof("Res=~p\n", [Res]),
-    {{Res, []}, NewS};
+    {reply, {Res, []}, NewS};
 
 %% http://bastu.gt16.se/bastu/del_user?username=jb
-do_cmd("del_user", L, _Json, A, S) ->
+do_cmd("del_user", L, _Json, A, _From, S) ->
     Sid = get_sid(A,L),
     Username = get_val("username", L, ""),
     case get_user_by_id(Sid, S) of
@@ -613,86 +612,100 @@ do_cmd("del_user", L, _Json, A, S) ->
             NewS = S,
             Res = {struct, [{error, "unknown sid"}]}
     end,
-    {{Res, []}, NewS};
+    {reply, {Res, []}, NewS};
 
-do_cmd("get_status", L, _Json, Arg, S) ->
-    Sid = get_sid(Arg, L),
-    case get_user_by_id(Sid, S) of
-        U=#user{} ->
-            Res =
-                try
-                    {ok, Temp}   = call_device(U, "get_temp"),
-                    {ok, Status} = call_device(U, "get_status"),
-                    {ok, EndsAt} = call_device(U, "get_end_time"),
-                    {struct, [{"temperature", Temp},
-                              {"status", Status},
-                              {"end_time", EndsAt}]}
-                catch
-                    X:Y ->
-                        error_logger:format("get_status failed: ~p:~p\n",
-                                            [X,Y]),
-                        {struct, [{"error", "no response"}]}
-                end;
-        _ ->
-            Res = {struct, [{error, "unknown sid"}]}
-    end,
-    {{Res, []}, S};
+do_cmd("get_status", L, _Json, Arg, From, S) ->
+    proc_lib:spawn_link(
+      fun() ->
+              try
+                  Sid = get_sid(Arg, L),
+                  case get_user_by_id(Sid, S) of
+                      U=#user{} ->
+                          {ok, Temp}   = call_device(U, "get_temp"),
+                          {ok, Status} = call_device(U, "get_status"),
+                          {ok, EndsAt} = call_device(U, "get_end_time"),
+                          Res = {struct, [{"temperature", Temp},
+                                          {"status", Status},
+                                          {"end_time", EndsAt}]};
+                      _ ->
+                          Res = {struct, [{error, "unknown sid"}]}
+                  end,
+                  gen_server:reply(From, {Res, []})
+              catch
+                  X:Y ->
+                      error_logger:format(
+                        "get_status failed: ~p:~p\n", [X,Y]),
+                      ERes = {struct, [{"error", "no response"}]},
+                      gen_server:reply(From, {ERes, []})
+              end
+      end),
+    {noreply, S};
 
-do_cmd("switch_on", L, _Json, Arg, S) ->
-    Sid = get_sid(Arg, L),
-    case get_user_by_id(Sid, S) of
-        U=#user{} ->
-            Res =
-                try
-                    case call_device(U, "sauna_on") of
-                        {ok, Ok} ->
-                            {struct, [{"result", to_string(Ok)}]};
-                        {error, "no such device"} ->
-                            {struct, [{"error", "no such device"}]};
-                        {error, "no response"}->
-                            {struct, [{"error", "no response"}]};
-                        _ ->
-                            {struct, [{"error", "internal"}]}
-                    end
-                catch
-                    X:Y ->
-                        error_logger:format("switch_on failed: ~p:~p\n",
-                                            [X,Y]),
-                        {struct, [{"error", "no response"}]}
-                end;
-        _ ->
-            Res = {struct, [{error, "unknown sid"}]}
-    end,
-    {{Res,[]}, S};
+do_cmd("switch_on", L, _Json, Arg, From, S) ->
+    proc_lib:spawn_link(
+      fun() ->
+              try
+                  Sid = get_sid(Arg, L),
+                  case get_user_by_id(Sid, S) of
+                      U=#user{} ->
+                          Res =
+                              case call_device(U, "sauna_on") of
+                                  {ok, Ok} ->
+                                      {struct, [{"result", to_string(Ok)}]};
+                                  {error, "no such device"} ->
+                                      {struct, [{"error", "no such device"}]};
+                                  {error, "no response"}->
+                                      {struct, [{"error", "no response"}]};
+                                  _ ->
+                                      {struct, [{"error", "internal"}]}
+                              end;
+                      _ ->
+                          Res = {struct, [{error, "unknown sid"}]}
+                  end,
+                  gen_server:reply(From, {Res,[]})
+              catch
+                  X:Y ->
+                      error_logger:format("switch_on failed: ~p:~p\n",
+                                          [X,Y]),
+                      ERes = {struct, [{"error", "no response"}]},
+                      gen_server:reply(From, {ERes, []})
+              end
+      end),
+    {noreply, S};
 
-do_cmd("switch_off", L, _Json, Arg, S) ->
-    Sid = get_sid(Arg, L),
-    case get_user_by_id(Sid, S) of
-        U=#user{} ->
-            Res =
-                try
-                    case call_device(U, "sauna_off") of
-                        {ok, Ok} ->
-                            {struct, [{"result", to_string(Ok)}]};
-                        {error, "no such device"} ->
-                            {struct, [{"error", "no such device"}]};
-                        {error, "no response"}->
-                            {struct, [{"error", "no response"}]};
-                        _ ->
-                            {struct, [{"error", "internal"}]}
-                    end
-                catch
-                    X:Y ->
-                        error_logger:format("switch_off failed: ~p:~p\n",
-                                            [X,Y]),
-                        {struct, [{"error", "no response"}]}
-                end;
-        _ ->
-            Res = {struct, [{error, "unknown sid"}]}
-    end,
-    {{Res,[]}, S};
+do_cmd("switch_off", L, _Json, Arg, From, S) ->
+    proc_lib:spawn_link(
+      fun() ->
+              try
+                  Sid = get_sid(Arg, L),
+                  case get_user_by_id(Sid, S) of
+                      U=#user{} ->
+                          Res =
+                              case call_device(U, "sauna_off") of
+                                  {ok, Ok} ->
+                                      {struct, [{"result", to_string(Ok)}]};
+                                  {error, "no such device"} ->
+                                      {struct, [{"error", "no such device"}]};
+                                  {error, "no response"}->
+                                      {struct, [{"error", "no response"}]};
+                                  _ ->
+                                      {struct, [{"error", "internal"}]}
+                              end;
+                      _ ->
+                          Res = {struct, [{error, "unknown sid"}]}
+                  end,
+                  gen_server:reply(From, {Res, []})
+              catch
+                  X:Y ->
+                      error_logger:format("switch_off failed: ~p:~p\n",
+                                          [X,Y]),
+                      ERes = {struct, [{"error", "no response"}]},
+                      gen_server:reply(From, {ERes, []})
+              end
+      end),
+    {noreply, S};
 
-do_cmd("unclaimed", L, _Json, Arg, S) ->
+do_cmd("unclaimed", L, _Json, Arg, _From, S) ->
     Sid = get_sid(Arg, L),
     case get_user_by_id(Sid, S) of
         #user{} ->
@@ -705,12 +718,12 @@ do_cmd("unclaimed", L, _Json, Arg, S) ->
             Res = {struct, [{error, "unknown sid"}]}
     end,
     ?liof("Res=~p\n", [Res]),
-    {{Res,[]}, S};
+    {reply, {Res,[]}, S};
 
-do_cmd(Unknown, _L, _Json, _Arg, S) ->
+do_cmd(Unknown, _L, _Json, _Arg, _From, S) ->
     Error = lists:flatten(io_lib:format("unknown request: ~p", [Unknown])),
     error_logger:format("~s", [Error]),
-    {{{struct, [{error, Error}]}, []}, S}.
+    {reply, {{struct, [{error, Error}]}, []}, S}.
 
 rpcreply({Response, ExtraHeaders}) ->
     X = json2:encode(Response),
@@ -1018,7 +1031,7 @@ call_device(U, Cmd) ->
     if U#user.device == undefined ->
             "no device";
        true ->
-            gen_server:call(comet, {call, U#user.device, Cmd})
+            gen_server:call(comet, {call, U#user.device, Cmd}, infinity)
     end.
 
 encode_pass(Password) ->

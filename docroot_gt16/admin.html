@@ -58,8 +58,7 @@
          if (res.error) {
            console.log("got an error while fetching users:"+res.error);
            if (res.error == "unknown sid") {
-             $("#login").show();
-             $("#page").hide();
+             window.location = "login.html";
            }
          }
          else {
@@ -181,49 +180,11 @@
      );
    }
 
-   function login() {
-     var user = $("#user").val().toLowerCase();
-     var password = $("#password").val();
-     var remember = $("#remember").attr("checked");
-
-     pubServerLogin(user, password, remember).then(
-       function(res) {
-         if (res.error) {
-           console.log("login failed:"+res.error);
-           alert(res.error);
-           $("#login").show();
-           $("#page").hide();
-         }
-         else {
-           console.log("login successful: sid="+res.sid);
-           $("#login").hide();
-           $("#page").show();
-           pubServerGet("get_user").then(
-             function(res) {
-               me = res;
-               if (me.role == "admin") {
-                 $("#add").show();
-                 $("#admin-header").show();
-               } else {
-                 $("#add").hide();
-                 $("#admin-header").hide();
-               }
-
-               fetchUsers();
-             }
-           );
-         }
-       });
-   }
-
    function setup() {
      $("#dialog-confirm").hide();
      $("#dialog-add").hide();
 
      if ($.cookie("sid")) {
-       $("#login").hide();
-       $("#page").show();
-
        pubServerGet("get_user").then(
          function(res) {
            me = res;
@@ -241,13 +202,8 @@
        fetchUsers();
      }
      else {
-       $("#login").show();
-       $("#page").hide();
+       window.location = "login.html";
      }
-
-     $("#send-login").click(function() {
-       login();
-     });
 
      $("#add").click(function() {
        if (addUser == null) {
@@ -340,19 +296,11 @@
 
      $("#logout").click(function() {
        $.removeCookie('sid', { path: '/' });
-       $("#login").show();
-       $("#page").hide();
+       window.location = "login.html";
      });
 
      $("#control").click(function() {
        window.location = "index.html";
-     });
-
-     $('#user, #password').bind('keyup', function(e) {
-       if (e.which == 13) {
-         e.preventDefault();
-         login();
-       }
      });
 
      $('#dialog-add input').bind('keyup', function(e) {
@@ -459,26 +407,5 @@
     </div>
 
   </div>
-
-  <div id="login">
-    <h3>Login</h3>
-    <div class="line">
-      <div class="title">User</div>
-      <input type="text" id="user" placeholder="USERNAME"/>
-    </div>
-    <div class="line">
-      <div class="title">Password</div>
-      <input type="password" id="password" autocomplete=”off”/>
-    </div>
-    <div class="line">
-      <input type="checkbox" id="remember" placeholser="PASSWORD"/>
-      <label for="remember">Keep me logged in</label>
-    </div>
-
-    <div class="button" id="send-login">
-      Login
-    </div>
-  </div>
-
 </body>
 </html>

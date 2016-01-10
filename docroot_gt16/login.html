@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" itemscope itemtype="http://schema.org/Article">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="default.css" rel="stylesheet" type="text/css">
+  <script src="jquery-2.1.4.js"></script>
+  <script src="jquery.cookie.js"></script>
+  <script src="support.js"></script>
+
+  <script>
+
+   function login() {
+     var user = $("#user").val().toLowerCase();
+     var password = $("#password").val();
+     var remember = $("#remember").attr("checked");
+
+     pubServerLogin(user, password, remember).then(
+       function(res) {
+         if (res.error) {
+           alert(res.error);
+           console.log("login failed:"+res.error);
+         }
+         else {
+           console.log("login successful: sid="+res.sid);
+           window.location = "index.html";
+         }
+       });
+   }
+
+   function setup() {
+     if ($.cookie("sid"))
+       $.removeCookie('sid', { path: '/' });
+
+     $("#send-login").click(function() {
+       login();
+     });
+
+     $('#user, #password').bind('keyup', function(e) {
+       if (e.which == 13) {
+         e.preventDefault();
+         login();
+       }
+     });
+   }
+  </script>
+</head>
+
+<body onload="setup()">
+
+  <div id="login">
+    <h3>Login</h3>
+    <div class="line">
+      <div class="title">User</div>
+      <input type="text" id="user" placeholder="USERNAME"/>
+    </div>
+    <div class="line">
+      <div class="title">Password</div>
+      <input type="password" id="password"/>
+    </div>
+    <div class="line">
+      <input type="checkbox" id="remember" placeholser="PASSWORD"/>
+      <label for="remember">Keep me logged in</label>
+    </div>
+
+    <div class="button" id="send-login">
+      Login
+    </div>
+  </div>
+
+</body>
+</html>

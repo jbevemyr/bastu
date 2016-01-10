@@ -1,7 +1,7 @@
 %    -*- Erlang -*-
-%    File:	comet.erl  (~jb/work/bastu/src/comet.erl)
-%    Author:	Johan Bevemyr
-%    Created:	Tue Jan  5 12:28:41 2016
+%    File:      comet.erl  (~jb/work/bastu/src/comet.erl)
+%    Author:    Johan Bevemyr
+%    Created:   Tue Jan  5 12:28:41 2016
 %    Purpose:
 
 -module('comet').
@@ -37,7 +37,7 @@
 
 -define(ENTRY_TTL, (1000*60*30)).  %% 30 minutes
 -define(COMET_TTL, (1000*60)).     %% keep device comet query for 1 minute
--define(RPC_TTL, (1000*60)).       %% query timeout, 1 minte
+-define(RPC_TTL, (1000*5)).       %% query timeout, 1 minute
 
 %%
 
@@ -91,7 +91,10 @@ handle_call({call, Dev, Rpc}, From, S) ->
     Devices = S#state.devices,
     case lists:keysearch(Dev, #device.id, Devices) of
         {value, D} ->
-            D2 = D#device{queue=D#device.queue++[{From, Rpc}]},
+            RpcRef = mk_id(),
+            {ok, TRef} = timer:send_after(?RPC_TTL,
+                                          {rpc_timeout, Dev, RpcRef}),
+            D2 = D#device{queue=D#device.queue++[{From, Rpc, RpcRef, TRef}]},
             D3 = dispatch(D2),
             NewDevices = update_devices(Devices, D3),
             {noreply, S#state{devices=NewDevices}};
@@ -171,8 +174,7 @@ handle_info({device_timeout, Dev}, State) ->
     case lists:keysearch(Dev, #device.id, Devices) of
         {value, D} ->
             D2 = cancel_request(D),
-            D3 = cancel_pending(D2),
-            cancel_queue(D3),
+            cancel_queue(D2),
             NewDevices = lists:keydelete(Dev, #device.id, Devices),
             {noreply, State#state{devices=NewDevices}};
         _ ->
@@ -180,23 +182,20 @@ handle_info({device_timeout, Dev}, State) ->
     end;
 
 handle_info({rpc_timeout, Dev, RpcRef}, State) ->
+    ?liof("rpc timeout ~p ~p\n", [Dev, RpcRef]),
     %% haven't heard from device in a long time, remove
     Devices = State#state.devices,
     case lists:keysearch(Dev, #device.id, Devices) of
         {value, D} ->
-            case D#device.pending of
-                {_, RpcRef, _} ->
-                    D2 = cancel_pending(D),
-                    NewDevices = update_devices(Devices, D2),
-                    {noreply, State#state{devices=NewDevices}};
-                _ ->
-                    {noreply, State}
-            end;
+            D2 = cancel_rpc(D, RpcRef),
+            NewDevices = update_devices(Devices, D2),
+            {noreply, State#state{devices=NewDevices}};
         _ ->
             {noreply, State}
     end;
 
 handle_info(_Info, State) ->
+    ?liof("unknown info ~p\n", [_Info]),
     {noreply, State}.
 
 %%----------------------------------------------------------------------
@@ -222,10 +221,8 @@ dispatch(D) when D#device.queue == [] orelse
     %% - rpc already in progress or
     %% - device not asking for work
     D;
-dispatch(D=#device{queue=[{From, Rpc}|Rest]}) ->
+dispatch(D=#device{queue=[{From, Rpc, RpcRef, TRef}|Rest]}) ->
     %% device ready to get request
-    RpcRef = mk_id(),
-    {ok, TRef} = timer:send_after(?RPC_TTL, {rpc_timeout, D#device.id, RpcRef}),
     gen_server:reply(D#device.dev_from, {Rpc, RpcRef}),
     timer:cancel(D#device.dev_tref),
     D#device{pending={From, RpcRef, TRef},
@@ -254,12 +251,38 @@ cancel_pending(D) ->
        true ->
             ok
     end,
-    D#device{pending=undefined}.
+    D#device{pending = undefined}.
 
 cancel_queue(D) ->
+    if D#device.pending =/= undefined ->
+            {From, _RpcRef, TRef} = D#device.pending,
+            timer:cancel(TRef),
+            gen_server:reply(From, {error, "no response"});
+       true ->
+            ok
+    end,
+    [timer:cancel(TRef) ||
+        {_From, _Rpc, _RpcRef, TRef} <- D#device.queue],
     [gen_server:reply(From, {error, "no response"}) ||
-        {From, _Rpc} <- D#device.queue],
-    D#device{queue=[]}.
+        {From, _Rpc, _RpcRef, _TRef} <- D#device.queue],
+    D#device{pending=undefined, queue=[]}.
+
+cancel_rpc(D, RpcRef) ->
+    case D#device.pending of
+        {PFrom, RpcRef, _PTRef} ->
+            gen_server:reply(PFrom, {error, "no response"}),
+            NewPending = undefined;
+        _ ->
+            NewPending = D#device.pending
+    end,
+    case lists:keysearch(RpcRef, 3, D#device.queue) of
+        {value, {QFrom, _Rpc, RpcRef, _QTRef}} ->
+            gen_server:reply(QFrom, {error, "no response"}),
+            NewQueue = lists:keydelete(RpcRef, 3, D#device.queue);
+        _ ->
+            NewQueue = D#device.queue
+    end,
+    D#device{pending=NewPending, queue=NewQueue}.
 
 reply_pending(D, Res, Ref) ->
     if D#device.pending =/= undefined ->

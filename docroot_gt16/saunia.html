@@ -5,65 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="default.css" rel="stylesheet" type="text/css">
   <link href="toggles-full.css" rel="stylesheet" type="text/css">
-  <style type="text/css">
-    body {
-     margin: 0px;
-     padding: 0px;
-   }
-   .toggle-on {
-     background-image: url("onswitch.png") !important;
-   }
-   .toggle-off {
-     background-image: url("offswitch.png") !important;
-   }
-
-   .saunatoggle {
-     position: absolute;
-     top: 20px;
-     left: 300px;
-     z-index: 13;
-   }
-
-  </style>
-  <script src="jqueryrotate.js"></script>
   <script src="jquery-2.1.4.js"></script>
   <script src="jquery.cookie.js"></script>
   <script src="support.js"></script>
 
   <script>
-
-   function setTemp(temp) {
-     // 20 C  = rotate(-94deg)
-     // 120 C = rotate(94deg)
-     // 70 C  = rotate(0deg)
-
-     var rot;
-
-     if (temp >= 70) {
-       rot = (temp-70)*1.88;
-     }
-     else {
-       rot = (70-temp)*1.88*-1;
-     }
-     $("#tempimg").css("transform", "rotate("+rot+"deg)");
-   }
-
-   function setTime(time) {
-     // 0  = rotate(-138deg)
-     // 1  = rotate(-78deg)
-     // 2  = rotate(-210deg)
-     // 3  = rotate(34deg)
-     // 4  = rotate(
-
-     if (time < 0)
-       time=0;
-     else
-       time = time/60;
-
-     var rot = time*0.96-138;
-
-     $("#timeimg").css("transform", "rotate("+rot+"deg)");
-   }
 
    function convertTo24Hour(time) {
      time = time.toLowerCase();
@@ -110,8 +56,12 @@
            if (result.error == "no response" ||
                result.error == "no such device") {
 
+             $("#temperature").empty();
+             $("#temperature").append("<h2>Device not present</h2>");
+
              var myToggle = $("#switch").data('toggles');
              myToggle.toggle(false, false, true);
+             $("#runtime").hide();
            }
 
            if ($.cookie("sid")) {
@@ -136,17 +86,27 @@
        else {
 
          var temp = parseFloat(result.temperature);
-         setTemp(temp);
+         $("#temperature").empty();
+         $("#temperature").append("<h2>"+temp.toFixed(1)+" C</h2>");
 
          if (result.status == "off") {
            var myToggle = $("#switch").data('toggles');
+           $("#runtime").hide();
            myToggle.toggle(false, false, true);
-           setTime(0);
          }
          else {
            var myToggle = $("#switch").data('toggles');
            myToggle.toggle(true, false, true);
-           setTime(result.end_time);
+           $("#runtime").show();
+           $("#until").empty();
+           $("#remain").empty();
+           var endTime = new Date();
+           var remain = (new Date(result.end_time * 1000)).
+                                  toUTCString().match(/(\d\d:\d\d:\d\d)/)[0];
+           endTime.setSeconds(endTime.getSeconds()+result.end_time);
+
+           $("#until").append(convertTo24Hour(endTime.toLocaleTimeString()));
+           $("#remain").append(remain);
          }
 
          if ($.cookie("sid")) {
@@ -173,28 +133,9 @@
 
    function setup() {
 
-     // if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
-     //   // You are in mobile browser
-     //   $('<link>')
-     //     .appendTo('head')
-     //     .attr({type : 'text/css', rel : 'stylesheet'})
-     //     .attr('href', 'http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css');
-     //   $('<link>')
-     //     .appendTo('head')
-     //     .attr({type : 'text/css', rel : 'stylesheet'})
-     //     .attr('href', 'css/themes/jquery.mobile.icons.min.css');
-     //   $('<link>')
-     //     .appendTo('head')
-     //     .attr({type : 'text/css', rel : 'stylesheet'})
-     //     .attr('href', 'jquery-ui.theme.min.css');
-     //   $.getScript("http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js");
-     // }
-     // else {
-     // }
-
      $('#switch').toggles({
        on: false, width: 100, height:40,
-       drag: true, click:true, text: {on: "", off: ""},
+       drag: true, click:true, text: {on: "ON", off: "OFF"},
        animate: 250,
        easing: 'swing',
        checkbox: null,
@@ -237,6 +178,7 @@
            else {
              $("#login").hide();
              $("#page").show();
+             $("#runtime").hide();
            }
            refresh();
          });
@@ -279,11 +221,20 @@
 <body onload="setup()">
 
   <div id="page">
-    <div id="tempotime">
-      <img id="dialback" src="bastutermochtimerBG.jpg">
-      <img id="tempimg" src="timeindicator.png">
-      <img id="timeimg" src="timeindicator.png">
-      <div class="toggle toggle-modern saunatoggle" id="switch"></div>
+    <div id="temperature">
+    </div>
+
+    <div id="runtime">
+      <div class="line">Off at: <span id="until"></span></div>
+      <div class="line">Remaining: <span id="remain"></span></div>
+    </div>
+
+    <div id="controls">
+      <div id="switchboard">
+        <div class="toggle toggle-modern" id="switch"></div>
+      </div>
+      <!-- <button id="enable">Turn On</button> -->
+      <!-- <button id="disable">Turn Off</button> -->
     </div>
 
     <div class="button" id="logout">
