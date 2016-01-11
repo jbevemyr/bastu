@@ -77,6 +77,7 @@ handle_info(temp, S) ->
     catch
 	X:Y ->
 	    error_logger:format("failed to read temp: ~p:~p\n", [X,Y]),
+            timer:send_after(5000, temp),
 	    {noreply, S#state{temp="0"}}
     end;
 handle_info(sauna_timeout, S) ->
