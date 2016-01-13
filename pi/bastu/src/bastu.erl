@@ -67,19 +67,26 @@ handle_call(Request, _From, S) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({temp, TempStr}, S) ->
+    {noreply, S#state{temp=TempStr}};
 handle_info(temp, S) ->
-    try
-	Temp = string:strip(os:cmd("/usr/local/src/lightstrip/readtemp.sh"),
-			    both, $\n),
-	[_,TempStr] = string:tokens(Temp, "="),
-	timer:send_after(5000, temp),
-	{noreply, S#state{temp=TempStr}}
-    catch
-	X:Y ->
-	    error_logger:format("failed to read temp: ~p:~p\n", [X,Y]),
-            timer:send_after(5000, temp),
-	    {noreply, S#state{temp="0"}}
-    end;
+    proc_lib:spawn_link(
+      fun() ->
+              try
+                  Temp = string:strip(
+                           os:cmd("/usr/local/src/lightstrip/readtemp.sh"),
+                           both, $\n),
+                  [_,TempStr] = string:tokens(Temp, "="),
+                  self() ! {temp, TempStr}
+              catch
+                  X:Y ->
+                      error_logger:format("failed to read temp: ~p:~p\n",
+                                          [X,Y]),
+                      self() ! {temp, "0"}
+              end
+      end),
+    timer:send_after(5000, temp),
+    {noreply, S};
 handle_info(sauna_timeout, S) ->
     gpip:write(S#state.hw_switch, 0),
     gpio:write(S#state.hw_timer, 0),
