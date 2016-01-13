@@ -76,7 +76,7 @@ handle_info(temp, S) ->
                   Temp = string:strip(
                            os:cmd("/usr/local/src/lightstrip/readtemp.sh"),
                            both, $\n),
-                  [_,TempStr] = string:tokens(Temp, "="),
+                  [_,TempStr|_] = string:tokens(Temp, "="),
                   self() ! {temp, TempStr}
               catch
                   X:Y ->
