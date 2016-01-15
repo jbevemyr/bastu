@@ -100,13 +100,13 @@ The bastu.erl server keeps has the following state
 
 ```erlang
 -record(state, {
-          hw_switch,         %% GPIO pin for controlling the on/off switch on the sauna
-	  hw_timer,          %% GPIO pin for controlling the timer switch on the sauna
-	  ref,               %% timer reference for the 3 hour on timer
-	  temp,              %% current temperature
-	  status="off",      %% current state on or off
-	  start_time=gnow()  %% time when the sauna was turned on
-         }).
+       hw_switch,         %% GPIO pin for controlling the on/off switch on the sauna
+       hw_timer,          %% GPIO pin for controlling the timer switch on the sauna
+       ref,               %% timer reference for the 3 hour on timer
+       temp,              %% current temperature
+       status="off",      %% current state on or off
+       start_time=gnow()  %% time when the sauna was turned on
+      }).
 
 ```
 
@@ -123,9 +123,9 @@ init([]) ->
 handle_call(sauna_on, _From, S) ->
     %% turn sauna on
     if S#state.hw_timer == undefined ->
-	    ok;
+            ok;
        true ->
-	    timer:cancel(S#state.hw_timer)
+            timer:cancel(S#state.hw_timer)
     end,
     gpio:write(S#state.hw_switch, 1),
     gpio:write(S#state.hw_timer, 1),
