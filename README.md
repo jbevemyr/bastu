@@ -150,6 +150,111 @@ handle_call(get_end_time, _From, S) ->
     {reply, Remain, S};
 ```
 
+The bastu_comet.erl code will send a work request to the server
+and ask if the server has anything for it to do. If the server
+has, for example, if the sauna web page is open and is requesting
+the current temperature, then it will receive a work request for
+the current temperature. It will then call the server above with
+a get_temp request, and report back the result with a reply request
+to the server.
+
+This is slightly backwards but gets around the problem of firewalls.
+We can assume that the PI is located behind a firewall which means
+that the web-server that runs the sauna web page cannot talk directly
+with the PI. Instead the PI has to connect to the web server (which
+is reachable on the internet) and regularly ask it for work.
+
+It goes like this:
+
+```
+
+PI                         Web Server                 Browser
+==                         ==========                 =======
+    GET work -->
+       (1 minute delay)
+              <-- REPLY work:nothing
+
+    GET work -->
+                                                      read temp
+                                        <-- GET temp
+              <-- REPLY work:get temp
+    POST reply (23 C) -->
+                                        REPLY 23C -->
+                                                     show in browser
+
+              <-- REPLY work:nothing
+    GET work -->                                     turn on
+                                       <-- GET turn on
+              <-- REPLY work:turn on
+    POST reply (ok) -->
+                                       REPLY ok -->
+                                                     show sauna on
+    ...
+```
+
+The bastu_comet.erl code is seen below. It is implemented as an
+Erlang gen_server that continously request work from the server,
+and perform any work that it gets back.
+
+```erlang
+-define(WORK_REQUEST_TTL, 5000).
+
+init([]) ->
+    timer:send_after(?WORK_REQUEST_TTL, work_request),
+    Id = get_id(),
+    {ok, #state{id=Id}}.
+
+handle_info({reply, RId, Res}, State) ->
+    %% Reply to previous request, and ask for more work
+    %% at the same time
+    Json = lists:flatten(json2:encode(to_string(Res))),
+    Url = ?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId,
+    WorkResponse = url:post(Url, Json),
+    process_work_response(WorkResponse),
+    {noreply, State};
+
+handle_info(work_request, State) ->
+    %% Ask for work
+    Url = ?PUBSERVER++"/bastu_pub/get-work?dev="++State#state.id,
+    WorkResponse = url:get(Url),
+    process_work_response(WorkResponse),
+    {noreply, State};
+```
+
+```erlang
+process_work_response(Work) ->
+    case Work of
+        {200, _Header, Body0} ->
+	    Body=lists:flatten(Body0),
+            case json2:decode_string(Body) of
+                {ok, "nowork"} ->
+                    self() ! work_request;
+                {ok, {struct, Args}} ->
+                    Rpc = get_opt("rpc", Args, "noop"),
+                    Id = get_opt("id", Args, "noref"),
+                    do_rpc(Rpc, Id);
+                Other ->
+                    error_logger:format("got error when decoding json: ~p\n",
+                                        [Other]),
+                    self() ! work_request
+            end;
+        Error ->
+            error_logger:format("got error from server: ~p\n", [Error]),
+            %% got an error, wait a short time before we try again
+            %% to avoid flooding server with requests
+            timer:send_after(?WORK_REQUEST_TTL, work_request),
+            ok
+    end.
+
+do_rpc(Request, Id) ->
+    Res = gen_server:call(bastu, ?l2a(Request)),
+    self() ! {reply, Id, Res}.
+```
+
 ### Installation
 
 ### Usage
+
+Create an account at bastu.gt16.se by sending an email jb@bevemyr.com.
+The hardware address of the ethernet interface on the PI is used as
+device key.

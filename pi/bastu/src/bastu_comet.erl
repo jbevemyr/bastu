@@ -11,7 +11,7 @@
 
 -define(SERVER, ?MODULE).
 -define(PUBSERVER, "http://bastu.gt16.se").
--define(RETRY_TTL, 5000).
+-define(WORK_REQUEST_TTL, 5000).
 
 
 -define(i2l(X), integer_to_list(X)).
@@ -40,7 +40,7 @@ start() ->
          }).
 
 init([]) ->
-    timer:send_after(?RETRY_TTL, retry),
+    timer:send_after(?WORK_REQUEST_TTL, work_request),
     Id = get_id(),
     {ok, #state{id=Id}}.
 
@@ -52,69 +52,19 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({reply, RId, Res}, State) ->
-    ?liof("retry ~p ~p\n", [RId, Res]),
+    %% Reply to previous request, and ask for more work
+    %% at the same time
     Json = lists:flatten(json2:encode(to_string(Res))),
-    case url:post(?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId, Json) of
-        {200, _Header, Body0} ->
-	    Body=lists:flatten(Body0),
-	    %% ?liof("Body=~p\n", [Body]),
-            case json2:decode_string(Body) of
-                {ok, "nowork"} ->
-                    %% ?liof("nothing to do\n", []),
-                    self() ! retry;
-                {ok, {struct, Args}} ->
-                    Rpc = get_opt("rpc", Args, "noop"),
-                    Id = get_opt("id", Args, "noref"),
-                    %% ?liof("Got work Json from server: ~p\n", [Json]),
-                    do_rpc(Rpc, Id);
-                Other ->
-                    error_logger:format("got error when decoding json: ~p\n",
-                                        [Other]),
-                    self() ! retry
-            end;
-        {error, Reason} ->
-            error_logger:format("got error from server: ~p\n", [Reason]),
-            %% got an error, wait for retry
-            timer:send_after(?RETRY_TTL, retry),
-            ok;
-        Other ->
-            error_logger:format("got other from server: ~p\n", [Other]),
-            %% got an error, wait for retry
-            timer:send_after(?RETRY_TTL, retry),
-            ok
-    end,
+    Url = ?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId,
+    WorkResponse = url:post(Url, Json),
+    process_work_response(WorkResponse),
     {noreply, State};
 
-handle_info(retry, State) ->
-    ?liof("retry\n", []),
-    case url:get(?PUBSERVER++"/bastu_pub/get-work?dev="++State#state.id) of
-        {200, _Header, Body0} ->
-	    Body = lists:flatten(Body0),
-	    %% ?liof("Body=~p\n", [Body]),
-            case json2:decode_string(Body) of
-                {ok, {struct, Args}} ->
-                    Rpc = get_opt("rpc", Args, "noop"),
-                    Id = get_opt("id", Args, "noref"),
-                    %% ?liof("Got work from server: ~p:~p\n", [Rpc, Id]),
-                    do_rpc(Rpc, Id);
-		{ok, "nowork"} ->
-                    self() ! retry;
-                Other ->
-                    error_logger:format("got error when decoding json: ~p\n",
-                                        [Other]),
-                    self() ! retry
-            end;
-        {error, Reason} ->
-            error_logger:format("got error from server: ~p\n", [Reason]),
-            %% got an error, wait for retry
-            timer:send_after(?RETRY_TTL, retry),
-            ok;
-        Other ->
-            error_logger:format("got other from server: ~p\n", [Other]),
-            %% got an error, wait for retry
-            timer:send_after(?RETRY_TTL, retry),
-            ok
-    end,
+handle_info(work_request, State) ->
+    %% Ask for work
+    Url = ?PUBSERVER++"/bastu_pub/get-work?dev="++State#state.id,
+    WorkResponse = url:get(Url),
+    process_work_response(WorkResponse),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -127,6 +77,30 @@ code_change(_OldVsn, S, _Extra) ->
     {ok, S}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+process_work_response(Work) ->
+    case Work of
+        {200, _Header, Body0} ->
+	    Body=lists:flatten(Body0),
+            case json2:decode_string(Body) of
+                {ok, "nowork"} ->
+                    self() ! work_request;
+                {ok, {struct, Args}} ->
+                    Rpc = get_opt("rpc", Args, "noop"),
+                    Id = get_opt("id", Args, "noref"),
+                    do_rpc(Rpc, Id);
+                Other ->
+                    error_logger:format("got error when decoding json: ~p\n",
+                                        [Other]),
+                    self() ! work_request
+            end;
+        Error ->
+            error_logger:format("got error from server: ~p\n", [Error]),
+            %% got an error, wait a short time before we try again
+            %% to avoid flooding server with requests
+            timer:send_after(?WORK_REQUEST_TTL, work_request),
+            ok
+    end.
 
 do_rpc(Request, Id) ->
     Res = gen_server:call(bastu, ?l2a(Request)),
