@@ -168,27 +168,28 @@ It goes like this:
 
 ```
 
-PI                         Web Server                 Browser
-==                         ==========                 =======
+PI                                           Web Server                          Browser
+==                                           ==========                          =======
     GET work -->
-       (1 minute delay)
-              <-- REPLY work:nothing
+             (1 minute delay)
+                             <-- REPLY work:nothing
 
     GET work -->
-                                                      read temp
-                                        <-- GET temp
-              <-- REPLY work:get temp
+                                                                                read temp
+                                                             <-- GET temp
+                             <-- REPLY work:get temp
     POST reply (23 C) -->
-                                        REPLY 23C -->
-                                                     show in browser
+                                                             REPLY 23C -->
+                                                                                show in browser
 
-              <-- REPLY work:nothing
-    GET work -->                                     turn on
-                                       <-- GET turn on
-              <-- REPLY work:turn on
+                             <-- REPLY work:nothing
+    GET work -->  
+                                                                                turn on
+                                                             <-- GET turn on
+                             <-- REPLY work:turn on
     POST reply (ok) -->
-                                       REPLY ok -->
-                                                     show sauna on
+                                                             REPLY ok -->
+                                                                                show sauna on
     ...
 ```
 
