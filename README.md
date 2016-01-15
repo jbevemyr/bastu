@@ -148,6 +148,30 @@ handle_call(get_end_time, _From, S) ->
     %% Report for how much longer the sauna will be on
     Remain = S#state.start_time+3*60*60-gnow(),
     {reply, Remain, S};
+
+handle_info(sauna_timeout, S) ->
+    gpip:write(S#state.hw_switch, 0),
+    gpio:write(S#state.hw_timer, 0),
+    {noreply, S#state{ref=undefined, status="off"}};
+
+handle_info(temp, S) ->
+    proc_lib:spawn_link(
+      fun() ->
+              try
+                  Temp = string:strip(
+                           os:cmd("/usr/local/src/lightstrip/readtemp.sh"),
+                           both, $\n),
+                  [_,TempStr|_] = string:tokens(Temp, "="),
+                  self() ! {temp, TempStr}
+              catch
+                  X:Y ->
+                      error_logger:format("failed to read temp: ~p:~p\n",
+                                          [X,Y]),
+                      self() ! {temp, "0"}
+              end
+      end),
+    timer:send_after(5000, temp),
+    {noreply, S};
 ```
 
 The bastu_comet.erl code will send a work request to the server
