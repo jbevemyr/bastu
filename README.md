@@ -9,7 +9,7 @@ and to read the current temperature to see when it is ready to use.
 The solution is built around three main hardware components, 
 
 * a Raspberry PI (version 2)
-* one or two 25A 240VAC solid state relays (Crydom D2425)
+* one or two 25A 240VAC solid state relays: Crydom D2425 (for one phase) or Crydom D53TP25D (for three phase)
 * a I2C - 1wire temperature sensor (Dallas DS18B20)
 
 with a few supporting components detailed below.
@@ -45,7 +45,8 @@ and outputs 3.3V so it should not be a problem to control the
 relays directly from the GPIO pins. However, to be on the safe side
 we are using a level shifter that will raise the voltage from 3.3V
 to 5V. We use a Texas Instruments 74AHCT125. The max output current
-of the 74AHCT125 is 8mA which is enough to drive the D2425.
+of the 74AHCT125 is 8mA which is enough to drive the D2425 and the
+D53TP25D.
 
 #### Connecting to the Sauna Heater
 
@@ -58,7 +59,9 @@ and those with the controls built into the unit. Most have some
 switch that controls a mechanical relay and does not directly
 switch the high load circuitry going to the heater. Some have both
 an on/off switch and a timer, while some only has a mechanical
-timer (egg clock style).
+timer (egg clock style). For those we can use the D2425, for
+setups that have switches that directly controls the three phases
+we use the D53TP25D that allows us to switch all three phases.
 
 The idea is to connect our relay in parallel with the switches
 in the sauna controller. If there is an on/off switch, we connect
@@ -69,7 +72,6 @@ turning off the sauna. This means that if the sauna is turned
 on using this device, it must be turned off using it as well.
 And it also means that the sauna can be controlled using the
 original sauna controls as well.
-
 
 #### Schematics
 
