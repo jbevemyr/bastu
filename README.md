@@ -63,6 +63,13 @@ timer (egg clock style). For those we can use the D2425, for
 setups that have switches that directly controls the three phases
 we use the D53TP25D that allows us to switch all three phases.
 
+![D53TP25D](http://diskstation.bevemyr.com:30000/jb/bastu/blob/master/images/d53tp25d_physical.jpeg)
+
+The interals look like this:
+
+![D53TP25D](http://diskstation.bevemyr.com:30000/jb/bastu/blob/master/images/d53tp25d.jpeg)
+
+
 The idea is to connect our relay in parallel with the switches
 in the sauna controller. If there is an on/off switch, we connect
 one relay in parallel with that, if there is a timer switch we
