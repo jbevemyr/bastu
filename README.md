@@ -63,7 +63,7 @@ timer (egg clock style). For those we can use the D2425, for
 setups that have switches that directly controls the three phases
 we use the D53TP25D that allows us to switch all three phases.
 
-![D53TP25D](http://diskstation.bevemyr.com:30000/jb/bastu/raw/master/images/d53tp25d_phusical.jpeg)
+![D53TP25D](images/d53tp25d_phusical.jpeg)
 
 The interals look like this:
 
