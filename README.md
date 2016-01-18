@@ -67,7 +67,7 @@ we use the D53TP25D that allows us to switch all three phases.
 
 The interals look like this:
 
-![D53TP25D](http://diskstation.bevemyr.com:30000/jb/bastu/raw/master/images/d53tp25d.jpeg)
+![D53TP25D](images/d53tp25d.jpeg)
 
 
 The idea is to connect our relay in parallel with the switches
