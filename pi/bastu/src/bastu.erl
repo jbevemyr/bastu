@@ -88,7 +88,7 @@ handle_info(temp, S) ->
     timer:send_after(5000, temp),
     {noreply, S};
 handle_info(sauna_timeout, S) ->
-    gpip:write(S#state.hw_switch, 0),
+    gpio:write(S#state.hw_switch, 0),
     gpio:write(S#state.hw_timer, 0),
     {noreply, S#state{ref=undefined, status="off"}};
 handle_info(_Info, State) ->

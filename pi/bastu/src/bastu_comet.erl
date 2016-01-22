@@ -1,8 +1,8 @@
-%    -*- Erlang -*- 
-%    File:	bastu_comet.erl  (~jb/work/bastu/pi/bastu/src/bastu_comet.erl)
-%    Author:	Johan Bevemyr
-%    Created:	Tue Jan  5 15:05:18 2016
-%    Purpose:   
+%    -*- Erlang -*-
+%    File:      bastu_comet.erl  (~jb/work/bastu/pi/bastu/src/bastu_comet.erl)
+%    Author:    Johan Bevemyr
+%    Created:   Tue Jan  5 15:05:18 2016
+%    Purpose:
 
 -module('bastu_comet').
 -author('jb@bevemyr.com').
@@ -81,7 +81,7 @@ code_change(_OldVsn, S, _Extra) ->
 process_work_response(Work) ->
     case Work of
         {200, _Header, Body0} ->
-	    Body=lists:flatten(Body0),
+            Body=lists:flatten(Body0),
             case json2:decode_string(Body) of
                 {ok, "nowork"} ->
                     self() ! work_request;
@@ -112,7 +112,8 @@ do_rpc(Request, Id) ->
 get_id() ->
     {ok, Ifaces} = inet:getifaddrs(),
     Hw = get_hw(Ifaces),
-    string:join([lists:flatten(io_lib:format("~2.16.0B", [A])) || A <- Hw], ":").
+    string:join([lists:flatten(
+                   io_lib:format("~2.16.0B", [A])) || A <- Hw], ":").
 
 get_hw([]) ->
     %% dummy
@@ -141,8 +142,3 @@ to_string(B) when is_binary(B) ->
     ?b2l(B);
 to_string(T) ->
     T.
-
-
-
-
-    

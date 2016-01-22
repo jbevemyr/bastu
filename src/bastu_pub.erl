@@ -931,7 +931,6 @@ get_user_by_rpid(PRID, S) ->
 read_users() ->
     case file:read_file(?USER_DB) of
         {ok, B} ->
-            file:read_file(?USER_DB),
             {ok, {array, Users}} = json2:decode_string(?b2l(B)),
             [object2user(U) || U <- Users];
         _ ->
