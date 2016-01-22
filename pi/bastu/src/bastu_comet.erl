@@ -23,7 +23,7 @@
 -define(l2a(X), list_to_atom(X)).
 
 -define(stack(), try throw(1) catch _:_ -> erlang:get_stacktrace() end).
--define(liof(Fmt, Args), io:format(user, "~w:~w " ++ Fmt,[?MODULE,?LINE|Args])).
+-define(liof(Fmt, Args), io:format(user, "~w:~w ~p" ++ Fmt,[?MODULE,?LINE,time()|Args])).
 -define(liof_bt(Fmt, Args), io:format(user, "~w:~w ~s ~p\n",
                              [?MODULE, ?LINE,
                               io_lib:format(Fmt, Args), ?stack()])).
@@ -54,9 +54,12 @@ handle_cast(_Msg, State) ->
 handle_info({reply, RId, Res}, State) ->
     %% Reply to previous request, and ask for more work
     %% at the same time
+    %% ?liof("sending reply ~p ~p\n", [Res, RId]),
     Json = lists:flatten(json2:encode(to_string(Res))),
     Url = ?PUBSERVER++"/bastu_pub/reply?dev="++State#state.id++"&id="++RId,
+    %% ?liof("POST ~p\n", [Json]),
     WorkResponse = url:post(Url, Json),
+    %% ?liof("SENT ~p\n", [Json]),
     process_work_response(WorkResponse),
     {noreply, State};
 
@@ -82,6 +85,8 @@ process_work_response(Work) ->
     case Work of
         {200, _Header, Body0} ->
             Body=lists:flatten(Body0),
+            %% ?liof("process_work_response: ~p\n",
+            %%       [json2:decode_string(Body)]),
             case json2:decode_string(Body) of
                 {ok, "nowork"} ->
                     self() ! work_request;
@@ -103,7 +108,9 @@ process_work_response(Work) ->
     end.
 
 do_rpc(Request, Id) ->
+    %% ?liof("do_rpc ~p ~p\n", [Request, Id]),
     Res = gen_server:call(bastu, ?l2a(Request)),
+    %% ?liof("do_rpc response ~p ~p\n", [Res, Id]),
     self() ! {reply, Id, Res}.
 
 

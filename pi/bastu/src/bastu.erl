@@ -80,8 +80,8 @@ handle_info(temp, S) ->
                   self() ! {temp, TempStr}
               catch
                   X:Y ->
-                      error_logger:format("failed to read temp: ~p:~p\n",
-                                          [X,Y]),
+                    %% error_logger:format("failed to read temp: ~p:~p\n",
+                    %% [X,Y]),
                       self() ! {temp, "0"}
               end
       end),

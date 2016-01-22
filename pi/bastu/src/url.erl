@@ -23,6 +23,13 @@
 
 -define(i2l(I), integer_to_list(I)).
 
+-define(stack(), try throw(1) catch _:_ -> erlang:get_stacktrace() end).
+-define(liof(Fmt, Args), io:format(user, "~w:~w ~p" ++ Fmt,[?MODULE,?LINE,time()|Args])).
+-define(liof_bt(Fmt, Args), io:format(user, "~w:~w ~s ~p\n",
+                             [?MODULE, ?LINE,
+                              io_lib:format(Fmt, Args), ?stack()])).
+
+
 parse_url(Str) ->
     parse_url_scheme(Str, #hurl{}, []).
 
@@ -478,14 +485,25 @@ lowercase_ch(C) -> C.
 
 %% Need to use server specific network configuration...
 connect(SSL, Host, Port, SOpts) ->
-    ?dbg("Host = ~p\n", [Host]),
+    %% ?dbg("Host = ~p\n", [Host]),
+    %% ?liof("connect ~p\n", [Host]),
     case gethostbyname(Host, SOpts) of
         {ok, IP} ->
-            do_connect(SSL, IP, Port, SOpts#hurl_opts.timeout,
-                       [binary, {packet, raw},
-                        {nodelay, true}, {active, true} |
-                        SOpts#hurl_opts.sockopts]);
+            %% ?liof("got ip ~p\n",[IP]),
+            Res = do_connect(SSL, IP, Port, SOpts#hurl_opts.timeout,
+                             [binary, {packet, raw},
+                              {nodelay, true}, {active, true} |
+                              SOpts#hurl_opts.sockopts]),
+            %% ?liof("Connected ~p\n", [Res]),
+            case Res of
+                {ok, _} ->
+                    ok;
+                _ ->
+                    erlang:erase({dnscache, Host})
+            end,
+            Res;
         Error ->
+            %% ?liof("got error ~p\n",[Error]),
             Error
     end.
 
@@ -496,11 +514,18 @@ gethostbyname(Host, _SOpts) ->
         {ok, IP} ->
             {ok, IP};
         _ ->
-            case inet:gethostbyname(Host) of
-                {ok, HE} ->
-                    {ok, hd(HE#hostent.h_addr_list)};
-                Error ->
-                    Error
+            case erlang:get({dnscache, Host}) of
+                undefined ->
+                    case inet:gethostbyname(Host) of
+                        {ok, HE} ->
+                            Addr = hd(HE#hostent.h_addr_list),
+                            erlang:put({dnscache, Host}, Addr),
+                            {ok, Addr};
+                        Error ->
+                            Error
+                    end;
+                Addr ->
+                    {ok, Addr}
             end
     end.
 
