@@ -634,7 +634,8 @@ do_cmd("get_status", L, _Json, Arg, From, S) ->
               catch
                   X:Y ->
                       error_logger:format(
-                        "get_status failed: ~p:~p\n", [X,Y]),
+                        "get_status failed: ~p:~p\n~p\n",
+                        [X,Y,erlang:get_stacktrace()]),
                       ERes = {struct, [{"error", "no response"}]},
                       gen_server:reply(From, {ERes, []})
               end

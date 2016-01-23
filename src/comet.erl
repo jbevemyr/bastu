@@ -28,7 +28,7 @@
 -define(l2a(X), list_to_atom(X)).
 
 -define(stack(), try throw(1) catch _:_ -> erlang:get_stacktrace() end).
--define(liof(Fmt, Args), io:format(user, "~w:~w " ++ Fmt,[?MODULE,?LINE|Args])).
+-define(liof(Fmt, Args), io:format(user, "~w:~w ~p" ++ Fmt,[?MODULE,?LINE,time()|Args])).
 -define(liof_bt(Fmt, Args), io:format(user, "~w:~w ~s ~p\n",
                              [?MODULE, ?LINE,
                               io_lib:format(Fmt, Args), ?stack()])).
@@ -37,7 +37,7 @@
 
 -define(ENTRY_TTL, (1000*60*30)).  %% 30 minutes
 -define(COMET_TTL, (1000*60)).     %% keep device comet query for 1 minute
--define(RPC_TTL, (1000*5)).       %% query timeout, 1 minute
+-define(RPC_TTL, (1000*10)).       %% query timeout, 1 minute
 
 %%
 
@@ -95,6 +95,7 @@ handle_call({call, Dev, Rpc}, From, S) ->
             {ok, TRef} = timer:send_after(?RPC_TTL,
                                           {rpc_timeout, Dev, RpcRef}),
             D2 = D#device{queue=D#device.queue++[{From, Rpc, RpcRef, TRef}]},
+            %% ?liof("call ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
             D3 = dispatch(D2),
             NewDevices = update_devices(Devices, D3),
             {noreply, S#state{devices=NewDevices}};
@@ -102,6 +103,7 @@ handle_call({call, Dev, Rpc}, From, S) ->
             {reply, {error, "no such device"}, S}
     end;
 handle_call({get_work, Dev}, From, S) ->
+    %% ?liof("get_work ~p\n", [Dev]),
     Devices = S#state.devices,
     case lists:keysearch(Dev, #device.id, Devices) of
         {value, D} ->
@@ -118,6 +120,7 @@ handle_call({get_work, Dev}, From, S) ->
     NewDevices = update_devices(Devices, D6),
     {noreply, S#state{devices=NewDevices}};
 handle_call({reply, Dev, Res, Ref}, From, S) ->
+    %% ?liof("reply ~p ~p\n", [Dev, Res]),
     Devices = S#state.devices,
     case lists:keysearch(Dev, #device.id, Devices) of
         {value, D} ->
@@ -216,6 +219,7 @@ code_change(_OldVsn, S, _Extra) ->
 dispatch(D) when D#device.queue == [] orelse
                  D#device.pending =/= undefined orelse
                  D#device.dev_from == undefined ->
+    %% ?liof("nothing to do for ~p\n", [D#device.id]),
     %% nothing to do:
     %% - queue empty or
     %% - rpc already in progress or
@@ -223,6 +227,7 @@ dispatch(D) when D#device.queue == [] orelse
     D;
 dispatch(D=#device{queue=[{From, Rpc, RpcRef, TRef}|Rest]}) ->
     %% device ready to get request
+    %% ?liof("work for ~p: ~p ~p\n", [D#device.id, Rpc, RpcRef]),
     gen_server:reply(D#device.dev_from, {Rpc, RpcRef}),
     timer:cancel(D#device.dev_tref),
     D#device{pending={From, RpcRef, TRef},
