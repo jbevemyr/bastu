@@ -17,6 +17,9 @@ if [ "$_IP" ]; then
   printf "My IP address is %s\n" "$_IP"
 fi
 
+## On the server side to see which sessions are ongoing do:
+## ps auxwww | grep 22:
+
 su -s /bin/sh hagren -c 'autossh -M 0 -q -f -N -o "ServerAliveInterval 60" -o "ServerAliveCountMax 3" -R 3306:localhost:22 -p 2023 hagren@katten.bevemyr.com'
 
 (screen -d -m /usr/local/src/gitlab/bastu/pi/bastu/start.sh || true)

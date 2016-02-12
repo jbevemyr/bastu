@@ -56,12 +56,12 @@ out(#arg{req = #http_request{method = 'POST'},
            content_type = "multipart/form-data"++_}} = A) ->
     case yaws_api:parse_multipart_post(A) of
         [] ->
-            Res = {struct, [{error, "broken post"}]},
+            Res = {{struct, [{error, "broken post"}]}, []},
             rpcreply(Res);
         {cont, _, _}
           when is_record(A#arg.state, post_state),
                A#arg.state#post_state.count == 10 ->
-            Res = {struct, [{error, "to big post"}]},
+            Res = {{struct, [{error, "to big post"}]},[]},
             rpcreply(Res);
         {cont, Cont, Res}  ->
             PState = A#arg.state,
@@ -77,7 +77,7 @@ out(#arg{req = #http_request{method = 'POST'},
                     L = yaws_api:parse_query(A),
                     do_op(A#arg.appmoddata, L, Json, A);
                 _Reason ->
-                    Res = {struct, [{error,"invalid json"}]},
+                    Res = {{struct, [{error,"invalid json"}]}, []},
                     rpcreply(Res)
             end
     end;
@@ -94,7 +94,7 @@ out(#arg{req = #http_request{method = 'POST'},
         _Reason ->
             io:format("json=~p\n", [DecodedClidata]),
             io:format("got error ~p\n", [_Reason]),
-            Res = {struct, [{error,"invalid json"}]},
+            Res = {{struct, [{error,"invalid json"}]}, []},
             rpcreply(Res)
     end;
 out(#arg{req = #http_request{method = 'POST'}} = A) ->
@@ -126,7 +126,7 @@ out(#arg{req = #http_request{method = 'POST'}} = A) ->
                 _Reason ->
                     ?liof("json=~p\n", [Clidata]),
                     ?liof("got error ~p\n", [_Reason]),
-                    Res = {struct, [{error, "invalid json"}]},
+                    Res = {{struct, [{error, "invalid json"}]}, []},
                     rpcreply(Res)
             end
     end;
