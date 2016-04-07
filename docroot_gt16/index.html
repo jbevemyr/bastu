@@ -138,11 +138,11 @@
      });
    }
 
-   function refreshStats() {
-     refresh().then(function(res) {
-       setTimeout(refreshStats, 3000);
-     });
-   }
+   // function refreshStats() {
+   //   refresh().then(function(res) {
+   //     setTimeout(refreshStats, 3000);
+   //   });
+   // }
 
    function setup() {
 
@@ -174,8 +174,6 @@
        clicker: null,
        type: 'compact'
      });
-
-     refreshStats();
 
      $('#switch').on('toggle', function(e, active) {
        if (active) {
@@ -212,6 +210,12 @@
      $("#admin").click(function() {
        window.location = "admin.html";
      });
+
+     refresh();
+     // Make sure we keep update every 3 seconds
+     setInterval(function() {
+       refresh();
+     }, 3000);
    }
   </script>
 </head>
