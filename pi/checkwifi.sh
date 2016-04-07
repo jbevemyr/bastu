@@ -10,7 +10,7 @@ ping -c4 $GW > /dev/null
 
 if [ $? != 0 ]
 then
-  (date >> /var/log/restartlog || true)
+  sudo sh -c 'date >> /var/log/restartlog'
   sleep 5
   sudo /sbin/shutdown -r now
 fi
