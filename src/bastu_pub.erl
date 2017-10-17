@@ -25,6 +25,7 @@
 -export([out/1]).
 
 %%
+-define(LOGFILE, "/var/log/bastu").
 
 -define(SERVER, ?MODULE).
 -define(i2l(X), integer_to_list(X)).
@@ -142,10 +143,11 @@ out(A) ->
     %% io:format("got appmod request: ~p\n", [A#arg.appmoddata]),
     do_op(A#arg.appmoddata, L, [], A).
 
-do_op("get-work", L, Json, _Arg) ->
+do_op("get-work", L, Json, Arg) ->
     try
         Dev = get_val("dev", L, ""),
         %% ?liof("get-work ~p\n", [Dev]),
+        log("get_work", Arg, Dev),
         case gen_server:call(comet, {get_work, Dev}, infinity) of
             nowork ->
                 %% ?liof("no work for ~p\n", [Dev]),
@@ -162,10 +164,11 @@ do_op("get-work", L, Json, _Arg) ->
             rpcreply({Res2, []})
     end;
 
-do_op("reply", L, Json, _Arg) ->
+do_op("reply", L, Json, Arg) ->
     try
         Dev = get_val("dev", L, ""),
         Id = get_val("id", L, ""),
+        log("reply", Arg, {Dev, Json}),
         %% ?liof("reply ~p ~p\n~p\n", [Dev, Id, Json]),
         case gen_server:call(comet, {reply, Dev, Json, Id}, infinity) of
             nowork ->
@@ -621,6 +624,7 @@ do_cmd("get_status", L, _Json, Arg, From, S) ->
                   Sid = get_sid(Arg, L),
                   case get_user_by_id(Sid, S) of
                       U=#user{} ->
+                          log("get_status", Arg, U#user.username),
                           {ok, Temp}   = call_device(U, "get_temp"),
                           {ok, Status} = call_device(U, "get_status"),
                           {ok, EndsAt} = call_device(U, "get_end_time"),
@@ -649,6 +653,7 @@ do_cmd("switch_on", L, _Json, Arg, From, S) ->
                   Sid = get_sid(Arg, L),
                   case get_user_by_id(Sid, S) of
                       U=#user{} ->
+                          log("switch_on", Arg, U#user.username),
                           Res =
                               case call_device(U, "sauna_on") of
                                   {ok, Ok} ->
@@ -681,6 +686,7 @@ do_cmd("switch_off", L, _Json, Arg, From, S) ->
                   Sid = get_sid(Arg, L),
                   case get_user_by_id(Sid, S) of
                       U=#user{} ->
+                          log("switch_off", Arg, U#user.username),
                           Res =
                               case call_device(U, "sauna_off") of
                                   {ok, Ok} ->
@@ -718,7 +724,7 @@ do_cmd("unclaimed", L, _Json, Arg, _From, S) ->
         _ ->
             Res = {struct, [{error, "unknown sid"}]}
     end,
-    ?liof("Res=~p\n", [Res]),
+    %% ?liof("Res=~p\n", [Res]),
     {reply, {Res,[]}, S};
 
 do_cmd(Unknown, _L, _Json, _Arg, _From, S) ->
@@ -1036,3 +1042,15 @@ call_device(U, Cmd) ->
 
 encode_pass(Password) ->
     ?b2l(base64:encode(crypto:hash(md5, Password))).
+
+log(Msg, Arg, Params) ->
+    try
+        IpPort = io_lib:format("~p", [Arg#arg.client_ip_port]),
+        Entry = [gtostr(gnow()), " - ", Msg, " - ", IpPort, " for ",
+                 io_lib:format("~p", [Params]),"\n"],
+        file:write_file(?LOGFILE, Entry, [append])
+    catch
+        X:Y ->
+            error_logger:format("failed to log: ~p:~p\n", [X,Y])
+    end.
+
