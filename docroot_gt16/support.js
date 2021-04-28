@@ -58,7 +58,7 @@ function makeJSONRequest(opts) {
 function serverGet(key) {
   var opts =
          { method: "GET",
-           url: "http://"+location.hostname+"/bastu/"+key,
+           url: location.protocol+"//"+location.hostname+"/bastu/"+key,
          };
   return makeJSONRequest(opts);
 }
@@ -66,7 +66,7 @@ function serverGet(key) {
 function serverGetPasswd(key, password) {
   var opts =
          { method: "GET",
-           url: "http://"+location.hostname+"/bastu/"+key,
+           url: location.protocol+"//"+location.hostname+"/bastu/"+key,
            query:  "password="+encodeURIComponent(password),
          };
   return makeJSONRequest(opts);
@@ -75,7 +75,7 @@ function serverGetPasswd(key, password) {
 function pubServerGet(key, query) {
   var opts =
          { method: "GET",
-           url: "http://"+location.hostname+"/bastu_pub/"+key,
+           url: location.protocol+"//"+location.hostname+"/bastu_pub/"+key,
          };
     if (query) opts["query"]=query;
   return makeJSONRequest(opts);
@@ -84,7 +84,7 @@ function pubServerGet(key, query) {
 function pubServerLogin(username, password, remember) {
   var opts =
          { method: "GET",
-           url: "http://"+location.hostname+"/bastu_pub/login",
+           url: location.protocol+"//"+location.hostname+"/bastu_pub/login",
            query:  ("user="+username+
                     "&password="+encodeURIComponent(password)+
                     "&remember="+remember)

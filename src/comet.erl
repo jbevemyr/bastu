@@ -324,5 +324,5 @@ gnow() ->
     {date(), time()}.
 
 mk_id() ->
-    N = random:uniform(16#ffffffffffffffff), %% 64 bits
+    N = rand:uniform(16#ffffffffffffffff), %% 64 bits
     ?i2l(N).

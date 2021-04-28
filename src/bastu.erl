@@ -10,7 +10,7 @@
 -compile(export_all).
 %%-export([Function/Arity, ...]).
 
--include("/usr/lib/yaws/include/yaws_api.hrl").
+-include("/usr/local/lib/yaws-2.0.8/include/yaws_api.hrl").
 
 -behaviour(gen_server).
 
@@ -125,9 +125,9 @@ do_op(Cmd, L, Json, Arg) ->
         Res = gen_server:call(?SERVER, {Cmd, L, Json, Arg}, infinity),
         rpcreply(Res)
     catch
-        X:Y ->
+        X:Y:Stacktrace ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
-                                [Cmd, L, Json, X, Y, erlang:get_stacktrace()]),
+                                [Cmd, L, Json, X, Y, Stacktrace]),
             Res2 = {struct, [{status, "error"},
                             {reason, "internal error"}]},
             rpcreply(Res2)
@@ -167,8 +167,7 @@ hard_reset() ->
 %%          {stop, Reason}
 %%----------------------------------------------------------------------
 init([]) ->
-    {X,Y,Z} = erlang:now(),
-    random:seed(X, Y, Z),
+    _ = rand:seed(exrop),
     {ok, #state{}}.
 
 %%----------------------------------------------------------------------
@@ -189,10 +188,10 @@ handle_call({Cmd, L, Json, Arg}, _From, S) ->
         {Res, NewS} = do_cmd(Cmd, L, Json, Arg, S),
         {reply, Res, NewS}
     catch
-        X:Y ->
+        X:Y:Stacktrace ->
             error_logger:format(
               "error during exection of cmd ~p: ~p ~p\n",
-              [{Cmd, L, Json}, {X,Y}, erlang:get_stacktrace()]),
+              [{Cmd, L, Json}, {X,Y}, Stacktrace]),
             {reply, {struct, [{status, "error"}, {reason, "internal"}]}, S}
     end;
 

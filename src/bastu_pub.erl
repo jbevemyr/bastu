@@ -10,7 +10,7 @@
 -compile(export_all).
 %%-export([Function/Arity, ...]).
 
--include("/usr/lib/yaws/include/yaws_api.hrl").
+-include("/usr/local/lib/yaws-2.0.8/include/yaws_api.hrl").
 
 -behaviour(gen_server).
 
@@ -156,10 +156,9 @@ do_op("get-work", L, Json, Arg) ->
                 %% ?liof("got work for ~p ~p ~p\n", [Dev, Rpc, RpcRef]),
                 rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
-    catch X:Y ->
+    catch X:Y:Stacktrace ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
-                                ["get-work", L, Json, X, Y,
-                                 erlang:get_stacktrace()]),
+                                ["get-work", L, Json, X, Y, Stacktrace]),
             Res2 = {struct, [{error, "internal error"}]},
             rpcreply({Res2, []})
     end;
@@ -179,10 +178,9 @@ do_op("reply", L, Json, Arg) ->
                 rpcreply({{struct, [{rpc, Rpc}, {id, RpcRef}]}, []})
         end
     catch
-        X:Y ->
+        X:Y:Stacktrace ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
-                                ["reply", L, Json, X, Y,
-                                 erlang:get_stacktrace()]),
+                                ["reply", L, Json, X, Y, Stacktrace]),
             Res2 = {struct, [{error, "internal error"}]},
             rpcreply({Res2, []})
     end;
@@ -192,9 +190,9 @@ do_op(Cmd, L, Json, Arg) ->
         Res = gen_server:call(?SERVER, {Cmd, L, Json, Arg}, infinity),
         rpcreply(Res)
     catch
-        X:Y ->
+        X:Y:Stacktrace ->
             error_logger:format("crashed for ~p:~p:~p\n~p:~p\n~p\n",
-                                [Cmd, L, Json, X, Y, erlang:get_stacktrace()]),
+                                [Cmd, L, Json, X, Y, Stacktrace]),
             Res2 = {struct, [{error, "internal error"}]},
             rpcreply(Res2)
     end.
@@ -248,8 +246,7 @@ hard_reset() ->
 %%          {stop, Reason}
 %%----------------------------------------------------------------------
 init([]) ->
-    {X,Y,Z} = erlang:now(),
-    random:seed(X, Y, Z),
+    _ = rand:seed(exrop),
     Users = read_users(),
     comet:start_link(),
     {ok, #state{users=Users}}.
@@ -276,10 +273,10 @@ handle_call({Cmd, L, Json, Arg}, From, S) ->
         %% ?liof("Json=~p\n", [Json]),
         do_cmd(Cmd, L, Json, Arg, From, S)
     catch
-        X:Y ->
+        X:Y:Stacktrace ->
             error_logger:format(
               "error during exection of cmd ~p: ~p ~p\n",
-              [{Cmd, L, Json}, {X,Y}, erlang:get_stacktrace()]),
+              [{Cmd, L, Json}, {X,Y}, Stacktrace]),
             {reply, {struct, [{error, "internal"}]}, S}
     end;
 
@@ -636,10 +633,10 @@ do_cmd("get_status", L, _Json, Arg, From, S) ->
                   end,
                   gen_server:reply(From, {Res, []})
               catch
-                  X:Y ->
+                  X:Y:Stacktrace ->
                       error_logger:format(
                         "get_status failed: ~p:~p\n~p\n",
-                        [X,Y,erlang:get_stacktrace()]),
+                        [X,Y,Stacktrace]),
                       ERes = {struct, [{"error", "no response"}]},
                       gen_server:reply(From, {ERes, []})
               end
@@ -902,7 +899,7 @@ month(12) ->
     "Dec".
 
 mk_id(S) ->
-    N = random:uniform(16#ffffffffffffffff), %% 64 bits
+    N = rand:uniform(16#ffffffffffffffff), %% 64 bits
     Id = ?i2l(N),
     case lists:keysearch(Id, #user.sid, S#state.users) of
         {value, _} ->
@@ -912,7 +909,7 @@ mk_id(S) ->
     end.
 
 mk_rpid(S) ->
-    N = random:uniform(16#ffffffffffffffff), %% 64 bits
+    N = rand:uniform(16#ffffffffffffffff), %% 64 bits
     Id = ?i2l(N),
     case lists:keysearch(Id, #user.passwd_reset_id, S#state.users) of
         {value, _} ->
